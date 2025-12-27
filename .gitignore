@@ -17,6 +17,11 @@ data/worlds/*/force_loaded.txt
 data/worlds/*/*.png
 data/debug.txt
 
+# Backup files
+*.backup
+*.bak
+*~
+
 # Python
 agent/__pycache__/
 agent/*.pyc
@@ -30,7 +35,6 @@ agent/venv/
 .idea/
 *.swp
 *.swo
-*~
 
 # OS
 .DS_Store

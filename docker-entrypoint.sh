@@ -5,7 +5,7 @@ DATA_DIR="/data"
 CONF_FILE="$DATA_DIR/minetest.conf"
 WORLD_NAME="${WORLD_NAME:-world}"
 WORLD_DIR="$DATA_DIR/worlds/$WORLD_NAME"
-GAME_ID="${GAME_ID:-minetest}"
+GAME_ID="${GAME_ID:-devtest}"
 
 # Run world initialization script if it exists
 if [ -f "/scripts/init-world.sh" ]; then
@@ -32,4 +32,11 @@ if [ "$#" -gt 0 ]; then
   exec "$@"
 fi
 
-exec minetestserver --config "$CONF_FILE" --world "$WORLD_DIR" --gameid "$GAME_ID"
+# Copy devtest game to data directory if not present
+if [ ! -d "$DATA_DIR/games/$GAME_ID" ] && [ -d "/usr/share/games/minetest/games/$GAME_ID" ]; then
+  echo "Copying $GAME_ID game to data directory..."
+  mkdir -p "$DATA_DIR/games"
+  cp -r "/usr/share/games/minetest/games/$GAME_ID" "$DATA_DIR/games/"
+fi
+
+exec /usr/games/minetestserver --config "$CONF_FILE" --world "$WORLD_DIR" --gameid "$GAME_ID"
