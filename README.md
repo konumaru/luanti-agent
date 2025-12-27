@@ -60,7 +60,29 @@ Default configuration:
 
 ### Customizing the World
 
-To customize world settings:
+#### Changing the Seed
+
+You can set a custom seed using the `FIXED_SEED` environment variable:
+
+```yaml
+# In docker-compose.yml
+services:
+  luanti:
+    environment:
+      - WORLD_NAME=world
+      - GAME_ID=devtest
+      - FIXED_SEED=98765432
+```
+
+Or via command line:
+
+```bash
+docker compose run -e FIXED_SEED=98765432 luanti
+```
+
+#### Other Customizations
+
+To customize other world settings:
 
 1. Edit `config/minetest.conf.template` before building
 2. Rebuild the Docker image: `docker compose build`

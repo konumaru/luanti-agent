@@ -20,6 +20,12 @@ download_github_mod() {
     local repo_url="$2"
     local branch="${3:-master}"
     
+    # Validate mod_name contains only safe characters
+    if ! [[ "$mod_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "  Error: Invalid mod name: $mod_name"
+        return 1
+    fi
+    
     echo "Downloading mod: $mod_name from $repo_url (branch: $branch)"
     
     if [ -d "$MODS_DIR/$mod_name" ]; then
@@ -47,6 +53,16 @@ download_contentdb_mod() {
     local mod_name="$1"
     local author="$2"
     
+    # Validate parameters contain only safe characters
+    if ! [[ "$mod_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "  Error: Invalid mod name: $mod_name"
+        return 1
+    fi
+    if ! [[ "$author" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "  Error: Invalid author name: $author"
+        return 1
+    fi
+    
     echo "Downloading mod: $mod_name from ContentDB (author: $author)"
     
     if [ -d "$MODS_DIR/$mod_name" ]; then
@@ -63,11 +79,22 @@ download_contentdb_mod() {
         return 1
     }
     
-    unzip -q "${mod_name}.zip"
-    mv "${mod_name}" "$MODS_DIR/"
-    rm "${mod_name}.zip"
+    # Extract and move to mods directory
+    unzip -q "${mod_name}.zip" -d "${mod_name}_extracted"
     
-    echo "  Successfully downloaded $mod_name"
+    # Find the mod directory (it may be nested)
+    local extracted_dir=$(find "${mod_name}_extracted" -maxdepth 2 -type f -name "mod.conf" -o -name "init.lua" | head -1 | xargs dirname)
+    
+    if [ -n "$extracted_dir" ] && [ -d "$extracted_dir" ]; then
+        mv "$extracted_dir" "$MODS_DIR/$mod_name"
+        echo "  Successfully downloaded $mod_name"
+    else
+        echo "  Warning: Could not find mod files in archive"
+        rm -rf "${mod_name}_extracted" "${mod_name}.zip"
+        return 1
+    fi
+    
+    rm -rf "${mod_name}_extracted" "${mod_name}.zip"
 }
 
 # ========================================

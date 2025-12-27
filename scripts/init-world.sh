@@ -10,6 +10,7 @@ WORLD_DIR="$DATA_DIR/worlds/$WORLD_NAME"
 CONF_FILE="$DATA_DIR/minetest.conf"
 WORLD_MT_FILE="$WORLD_DIR/world.mt"
 MODS_DIR="$DATA_DIR/mods"
+FIXED_SEED="${FIXED_SEED:-12345678}"
 
 # Template files
 CONF_TEMPLATE="/config/minetest.conf.template"
@@ -19,6 +20,7 @@ echo "=== Luanti World Initialization ==="
 echo "Data directory: $DATA_DIR"
 echo "World name: $WORLD_NAME"
 echo "World directory: $WORLD_DIR"
+echo "Fixed seed: $FIXED_SEED"
 echo ""
 
 # Create directories
@@ -29,7 +31,8 @@ mkdir -p "$MODS_DIR"
 if [ ! -f "$CONF_FILE" ]; then
     echo "Creating minetest.conf from template..."
     if [ -f "$CONF_TEMPLATE" ]; then
-        cp "$CONF_TEMPLATE" "$CONF_FILE"
+        # Copy template and replace seed placeholder
+        sed "s/fixed_map_seed = 12345678/fixed_map_seed = $FIXED_SEED/" "$CONF_TEMPLATE" > "$CONF_FILE"
         echo "  minetest.conf created successfully"
     else
         echo "  Warning: Template not found at $CONF_TEMPLATE"
@@ -41,7 +44,7 @@ server_name = Luanti AI Agent Server
 server_announce = false
 enable_damage = true
 creative_mode = false
-fixed_map_seed = 12345678
+fixed_map_seed = $FIXED_SEED
 EOF
     fi
 else
@@ -88,7 +91,7 @@ echo ""
 echo "World configuration:"
 echo "  World directory: $WORLD_DIR"
 echo "  Game ID: devtest"
-echo "  Fixed seed: 12345678"
+echo "  Fixed seed: $FIXED_SEED"
 echo "  Damage enabled: true"
 echo "  Creative mode: false"
 echo ""

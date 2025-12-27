@@ -11,6 +11,7 @@ gameid = devtest
 world_name = world
 
 # Enabled Mods
+# python_bot is required for AI agent experiments via HTTP
 load_mod_python_bot = true
 
 # Add more mods here as needed
