@@ -4,6 +4,7 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     minetest-server \
     ca-certificates \
+    bash \
     git \
     wget \
     unzip \
