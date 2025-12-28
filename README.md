@@ -5,6 +5,7 @@ Luanti (Minetest) server with AI agent experiments - automatic world initializat
 ## Overview
 
 This project provides a Dockerized Luanti server designed for AI agent experiments with:
+
 - **Reproducible worlds**: Fixed seed ensures identical world generation
 - **Automatic initialization**: World and mods are set up automatically on first run
 - **Zero manual configuration**: Just run `docker compose up` and you're ready
@@ -51,6 +52,7 @@ Templates are located in the `config/` directory:
 ### World Settings
 
 Default configuration:
+
 - **Game ID**: devtest (built-in test game)
 - **Map Seed**: 12345678 (fixed for reproducibility)
 - **Map Generator**: v7 (with caves, dungeons, decorations)
@@ -106,6 +108,7 @@ download_github_mod "worldedit" "https://github.com/Uberi/Minetest-WorldEdit.git
 ```
 
 After editing:
+
 1. Rebuild: `docker compose build`
 2. Restart: `docker compose up -d`
 

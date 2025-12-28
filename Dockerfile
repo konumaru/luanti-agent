@@ -2,12 +2,12 @@ FROM debian:bookworm-slim
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-    minetest-server \
-    ca-certificates \
-    bash \
-    git \
-    wget \
-    unzip \
+  minetest-server \
+  ca-certificates \
+  bash \
+  git \
+  wget \
+  unzip \
   && rm -rf /var/lib/apt/lists/*
 
 # Copy initialization scripts and templates
