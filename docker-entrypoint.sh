@@ -5,12 +5,12 @@ DATA_DIR="/data"
 CONF_FILE="$DATA_DIR/minetest.conf"
 WORLD_NAME="${WORLD_NAME:-world}"
 WORLD_DIR="$DATA_DIR/worlds/$WORLD_NAME"
-GAME_ID="${GAME_ID:-devtest}"
+GAME_ID="${GAME_ID:-mineclone2}"
 
 # Run world initialization script if it exists
 if [ -f "/scripts/init-world.sh" ]; then
   echo "Running world initialization script..."
-  DATA_DIR="$DATA_DIR" WORLD_NAME="$WORLD_NAME" /scripts/init-world.sh
+  DATA_DIR="$DATA_DIR" WORLD_NAME="$WORLD_NAME" GAME_ID="$GAME_ID" /scripts/init-world.sh
 else
   echo "World initialization script not found, using basic setup..."
   mkdir -p "$WORLD_DIR"

@@ -36,11 +36,14 @@ The server will be available at `localhost:30000` (UDP).
 
 On first run, the initialization script (`scripts/init-world.sh`) automatically:
 
-1. Creates the world directory structure
-2. Copies configuration from templates
-3. Sets fixed map seed (12345678) for reproducibility
-4. Downloads and installs mods (if configured)
-5. Configures game settings (damage, creative mode, etc.)
+1. Downloads and installs MineClone2 game (requires network access)
+2. Creates the world directory structure
+3. Copies configuration from templates
+4. Sets fixed map seed (12345678) for reproducibility
+5. Downloads and installs mods (if configured)
+6. Configures game settings (damage, creative mode, etc.)
+
+**Note**: MineClone2 is downloaded from the official Git repository on first startup. If running in an offline environment or if the download fails, you can manually place the MineClone2 game files in `data/games/mineclone2/`.
 
 ### Configuration Templates
 
@@ -53,7 +56,7 @@ Templates are located in the `config/` directory:
 
 Default configuration:
 
-- **Game ID**: devtest (built-in test game)
+- **Game ID**: mineclone2 (Minecraft-like game for Minetest)
 - **Map Seed**: 12345678 (fixed for reproducibility)
 - **Map Generator**: v7 (with caves, dungeons, decorations)
 - **Damage**: Enabled
@@ -72,7 +75,7 @@ services:
   luanti:
     environment:
       - WORLD_NAME=world
-      - GAME_ID=devtest
+      - GAME_ID=mineclone2
       - FIXED_SEED=98765432
 ```
 
@@ -125,6 +128,31 @@ load_mod_worldedit = true
 
 - **python_bot**: HTTP-controlled bot for AI agent experiments (in `data/mods/python_bot/`)
 
+## Game Management
+
+### Changing Games
+
+The default game is MineClone2. To use a different game:
+
+1. Edit `docker-compose.yml` and change `GAME_ID`:
+   ```yaml
+   environment:
+     - GAME_ID=minetest_game  # or another game
+   ```
+
+2. Edit `scripts/download-games.sh` to download your preferred game
+
+3. Update `config/world.mt.template` to set the correct `gameid`
+
+### Manual Game Installation
+
+If automatic download fails or you're in an offline environment:
+
+1. Download MineClone2 manually from https://git.minetest.land/MineClone2/MineClone2
+2. Extract it to `data/games/mineclone2/`
+3. Ensure the directory contains `game.conf` and `mods/` subdirectory
+4. Start the server: `docker compose up -d`
+
 ## Project Structure
 
 ```
@@ -132,13 +160,19 @@ load_mod_worldedit = true
 ├── config/
 │   ├── minetest.conf.template    # Server configuration template
 │   └── world.mt.template          # World metadata template
+```
+.
+├── config/
+│   ├── minetest.conf.template    # Server configuration template
+│   └── world.mt.template          # World metadata template
 ├── scripts/
 │   ├── init-world.sh              # World initialization script
-│   └── download-mods.sh           # Mod download/management script
+│   ├── download-mods.sh           # Mod download/management script
+│   └── download-games.sh          # Game download/management script
 ├── data/
 │   ├── mods/                      # Installed mods
 │   ├── worlds/                    # World data (generated)
-│   ├── games/                     # Game definitions (devtest)
+│   ├── games/                     # Game definitions (mineclone2)
 │   └── minetest.conf              # Active server config (generated)
 ├── agent/                         # AI agent Python code
 ├── Dockerfile                     # Custom Luanti server image
@@ -200,7 +234,8 @@ See `agent/` directory for the Python agent implementation.
 
 - This is designed for **experimental/development use**
 - World data (SQLite databases, player data) is excluded from git
-- The `devtest` game is used by default (minimal, good for testing)
+- The `mineclone2` game is used by default (Minecraft-like experience)
+- MineClone2 is automatically downloaded from ContentDB on first run
 - Mods can be added without modifying core files
 
 ## License

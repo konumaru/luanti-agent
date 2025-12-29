@@ -10,7 +10,9 @@ WORLD_DIR="$DATA_DIR/worlds/$WORLD_NAME"
 CONF_FILE="$DATA_DIR/minetest.conf"
 WORLD_MT_FILE="$WORLD_DIR/world.mt"
 MODS_DIR="$DATA_DIR/mods"
+GAMES_DIR="$DATA_DIR/games"
 FIXED_SEED="${FIXED_SEED:-12345678}"
+GAME_ID="${GAME_ID:-mineclone2}"
 
 # Template files
 CONF_TEMPLATE="/config/minetest.conf.template"
@@ -26,6 +28,17 @@ echo ""
 # Create directories
 mkdir -p "$WORLD_DIR"
 mkdir -p "$MODS_DIR"
+mkdir -p "$GAMES_DIR"
+
+# Download and setup games
+echo ""
+if [ -f "/scripts/download-games.sh" ]; then
+    echo "Running game download script..."
+    GAMES_DIR="$GAMES_DIR" /scripts/download-games.sh
+else
+    echo "Game download script not found, skipping game setup..."
+fi
+echo ""
 
 # Initialize minetest.conf
 if [ ! -f "$CONF_FILE" ]; then
@@ -67,7 +80,7 @@ mod_storage_backend = sqlite3
 auth_backend = sqlite3
 player_backend = sqlite3
 backend = sqlite3
-gameid = devtest
+gameid = $GAME_ID
 world_name = $WORLD_NAME
 load_mod_python_bot = true
 EOF
@@ -90,7 +103,7 @@ echo "=== World initialization complete ==="
 echo ""
 echo "World configuration:"
 echo "  World directory: $WORLD_DIR"
-echo "  Game ID: devtest"
+echo "  Game ID: $GAME_ID"
 echo "  Fixed seed: $FIXED_SEED"
 echo "  Damage enabled: true"
 echo "  Creative mode: false"

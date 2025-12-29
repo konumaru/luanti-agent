@@ -6,7 +6,7 @@ services:
     container_name: luanti
     environment:
       - WORLD_NAME=world
-      - GAME_ID=devtest
+      - GAME_ID=mineclone2
     volumes:
       - ./data:/data
     ports:
