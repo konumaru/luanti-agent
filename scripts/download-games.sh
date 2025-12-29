@@ -49,9 +49,10 @@ download_contentdb_game() {
     unzip -q "${game_name}.zip" -d "${game_name}_extracted"
     
     # Find the game directory (it may be nested)
-    local extracted_dir=$(find "${game_name}_extracted" -maxdepth 2 -type f -name "game.conf" | head -1 | xargs dirname)
+    local extracted_dir=$(find "${game_name}_extracted" -maxdepth 2 -type f -name "game.conf" | head -1)
     
-    if [ -n "$extracted_dir" ] && [ -d "$extracted_dir" ]; then
+    if [ -n "$extracted_dir" ]; then
+        extracted_dir=$(dirname "$extracted_dir")
         mv "$extracted_dir" "$GAMES_DIR/$game_name"
         echo "  Successfully downloaded $game_name"
     else

@@ -14,6 +14,13 @@ GAMES_DIR="$DATA_DIR/games"
 FIXED_SEED="${FIXED_SEED:-12345678}"
 GAME_ID="${GAME_ID:-mineclone2}"
 
+# Validate GAME_ID contains only safe characters
+if ! [[ "$GAME_ID" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    echo "Error: Invalid GAME_ID: $GAME_ID"
+    echo "GAME_ID must contain only alphanumeric characters, underscores, and hyphens"
+    exit 1
+fi
+
 # Template files
 CONF_TEMPLATE="/config/minetest.conf.template"
 WORLD_MT_TEMPLATE="/config/world.mt.template"

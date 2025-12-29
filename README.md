@@ -160,11 +160,6 @@ If automatic download fails or you're in an offline environment:
 ├── config/
 │   ├── minetest.conf.template    # Server configuration template
 │   └── world.mt.template          # World metadata template
-```
-.
-├── config/
-│   ├── minetest.conf.template    # Server configuration template
-│   └── world.mt.template          # World metadata template
 ├── scripts/
 │   ├── init-world.sh              # World initialization script
 │   ├── download-mods.sh           # Mod download/management script
@@ -178,6 +173,7 @@ If automatic download fails or you're in an offline environment:
 ├── Dockerfile                     # Custom Luanti server image
 ├── docker-compose.yml             # Docker Compose configuration
 └── docker-entrypoint.sh           # Container entry point script
+```
 ```
 
 ## Development
