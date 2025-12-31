@@ -3,6 +3,10 @@
 
 agent_api = {}
 
+-- Constants
+local PLAYER_EYE_HEIGHT = 1.5  -- Player eye level offset for raycast
+local BLOCK_PLACE_OFFSET = {x = 0, y = 1, z = 0}  -- Default offset for block placement
+
 -- Configuration
 agent_api.config = {
     -- Python bot server URL (can be overridden via minetest.conf)
@@ -201,7 +205,7 @@ function agent_api.get_look_target(agent, max_distance)
     max_distance = max_distance or 5
     local pos = agent.player:get_pos()
     local look_dir = agent.player:get_look_dir()
-    local eye_pos = vector.add(pos, {x = 0, y = 1.5, z = 0})
+    local eye_pos = vector.add(pos, {x = 0, y = PLAYER_EYE_HEIGHT, z = 0})
     local end_pos = vector.add(eye_pos, vector.multiply(look_dir, max_distance))
     
     local ray = minetest.raycast(eye_pos, end_pos, true, false)
@@ -355,7 +359,7 @@ function agent_api.action_place(agent, node_name)
     local target = agent_api.get_look_target(agent, 5)
     if target and target.type == "node" then
         -- Place above the targeted node
-        local place_pos = vector.add(target.pos, {x = 0, y = 1, z = 0})
+        local place_pos = vector.add(target.pos, BLOCK_PLACE_OFFSET)
         
         -- Check if area is protected
         if minetest.is_protected(place_pos, agent.name) then
@@ -463,7 +467,7 @@ function agent_api.poll_commands(agent)
                     if cmd_success then
                         log("debug", "Received command: " .. cmd_json)
                     else
-                        log("debug", "Received command (unparseable)")
+                        log("debug", "Received command (unable to serialize for logging)")
                     end
                     agent_api.execute_action(agent, cmd)
                 end
