@@ -318,6 +318,20 @@ function agent_api.action_dig(agent)
     
     local target = agent_api.get_look_target(agent, 5)
     if target and target.type == "node" then
+        -- Check if area is protected
+        if minetest.is_protected(target.pos, agent.name) then
+            log("debug", "Agent " .. agent.name .. " cannot dig protected area at " .. minetest.pos_to_string(target.pos))
+            return false
+        end
+        
+        -- Check if node is diggable
+        local node = minetest.get_node(target.pos)
+        local node_def = minetest.registered_nodes[node.name]
+        if node_def and node_def.diggable == false then
+            log("debug", "Agent " .. agent.name .. " cannot dig undiggable node: " .. node.name)
+            return false
+        end
+        
         minetest.remove_node(target.pos)
         log("debug", "Agent " .. agent.name .. " dug at " .. minetest.pos_to_string(target.pos))
         return true
@@ -330,14 +344,29 @@ end
 function agent_api.action_place(agent, node_name)
     if not agent or not agent.player then return false end
     
+    node_name = node_name or "default:dirt"
+    
+    -- Validate node name exists and is registered
+    if not minetest.registered_nodes[node_name] then
+        log("warning", "Agent " .. agent.name .. " tried to place unknown node: " .. node_name)
+        return false
+    end
+    
     local target = agent_api.get_look_target(agent, 5)
     if target and target.type == "node" then
         -- Place above the targeted node
         local place_pos = vector.add(target.pos, {x = 0, y = 1, z = 0})
+        
+        -- Check if area is protected
+        if minetest.is_protected(place_pos, agent.name) then
+            log("debug", "Agent " .. agent.name .. " cannot place in protected area at " .. minetest.pos_to_string(place_pos))
+            return false
+        end
+        
         local node = minetest.get_node(place_pos)
         
         if node.name == "air" then
-            minetest.set_node(place_pos, {name = node_name or "default:dirt"})
+            minetest.set_node(place_pos, {name = node_name})
             log("debug", "Agent " .. agent.name .. " placed block at " .. minetest.pos_to_string(place_pos))
             return true
         end
@@ -415,7 +444,7 @@ function agent_api.poll_commands(agent)
     
     local http_api = minetest.request_http_api()
     if not http_api then
-        log("error", "HTTP API not available. Check secure.http_mods setting.")
+        log("error", "HTTP API not available. Add 'agent_api' to secure.http_mods in minetest.conf")
         return
     end
     
@@ -427,12 +456,19 @@ function agent_api.poll_commands(agent)
         method = "GET",
     }, function(result)
         if result.succeeded and result.code == 200 then
-            local data = minetest.parse_json(result.data)
-            if data and data.commands then
+            local success, data = pcall(minetest.parse_json, result.data)
+            if success and data and data.commands then
                 for _, cmd in ipairs(data.commands) do
-                    log("debug", "Received command: " .. minetest.write_json(cmd))
+                    local cmd_success, cmd_json = pcall(minetest.write_json, cmd)
+                    if cmd_success then
+                        log("debug", "Received command: " .. cmd_json)
+                    else
+                        log("debug", "Received command (unparseable)")
+                    end
                     agent_api.execute_action(agent, cmd)
                 end
+            elseif not success then
+                log("warning", "Failed to parse JSON response: " .. tostring(data))
             end
         elseif not result.succeeded then
             log("debug", "Poll failed: " .. (result.error or "unknown error"))
