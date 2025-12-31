@@ -7,6 +7,12 @@ from dataclasses import dataclass
 from typing import List, Optional, Dict, Any
 import json
 
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
+
 
 @dataclass
 class Position:
@@ -237,7 +243,10 @@ class AgentClient:
         Returns:
             True if successfully queued
         """
-        import requests
+        if not REQUESTS_AVAILABLE:
+            print("requests module not available. Install with: pip install requests")
+            return False
+            
         try:
             response = requests.post(
                 f"{self.server_url}/enqueue",
@@ -258,7 +267,10 @@ class AgentClient:
         Returns:
             True if successfully queued
         """
-        import requests
+        if not REQUESTS_AVAILABLE:
+            print("requests module not available. Install with: pip install requests")
+            return False
+            
         try:
             response = requests.post(
                 f"{self.server_url}/enqueue",
