@@ -17,23 +17,20 @@ from agent_client import (
 def simple_wandering_agent(client: AgentClient, duration: int = 60):
     """Simple agent that wanders around randomly
     
+    Note: This example uses action-only control. Observation data is collected
+    by the Lua mod but not yet sent to Python. Future enhancement will add
+    observation-based decision making.
+    
     Args:
         client: Agent client instance
         duration: How long to run (seconds)
     """
     print("Starting simple wandering agent...")
+    print("Note: Currently using action-only control (no observation feedback)")
     start_time = time.time()
     action_counter = 0
     
     while time.time() - start_time < duration:
-        # Get observation (placeholder - in real implementation this would come from Lua)
-        obs = client.get_observation()
-        
-        if obs:
-            print(f"Position: {obs.position}")
-            print(f"Health: {obs.health}")
-            print(f"Nearby entities: {len(obs.nearby_entities)}")
-        
         # Simple behavior: alternate between moving forward and rotating
         if action_counter % 10 < 5:
             # Move forward

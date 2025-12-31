@@ -273,8 +273,13 @@ class AgentClient:
     def get_observation(self) -> Optional[Observation]:
         """Get the latest observation from the agent
         
-        Note: This is a placeholder. In a real implementation, observations
-        would be pushed from the Lua mod to Python.
+        Note: Observation pushing from Lua to Python is not yet implemented.
+        This is a placeholder for future enhancement where observations would
+        be pushed from the Lua mod to Python via HTTP POST or WebSocket.
+        
+        Current implementation: The Lua mod collects observations internally
+        but does not send them to Python. Actions are sent from Python to Lua
+        via the command queue.
         
         Returns:
             Latest observation or None
@@ -283,6 +288,8 @@ class AgentClient:
     
     def update_observation(self, obs_data: Dict[str, Any]):
         """Update observation from received data
+        
+        This is a placeholder for when observation pushing is implemented.
         
         Args:
             obs_data: Observation data dictionary

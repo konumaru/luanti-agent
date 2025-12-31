@@ -96,6 +96,23 @@ create an agent when a player named `agent_api.agent_name` joins.
 /agent_list             - List all active agents
 ```
 
+### Current Implementation Status
+
+✅ **Implemented:**
+- Complete action API (movement, rotation, dig, place, use)
+- Observation collection in Lua (position, orientation, blocks, entities, vision)
+- HTTP-based command polling from Lua to Python
+- Example control behaviors
+
+⚠️ **Planned for future enhancement:**
+- Observation pushing from Lua to Python (currently observations are collected but not sent)
+- WebSocket communication for real-time bidirectional data
+- Advanced interaction logic (right-click, punch, item use)
+- Path planning and high-level behaviors
+
+The current implementation provides a solid foundation for action-based control.
+Observation feedback will be added in future updates.
+
 ### Example Behaviors
 
 ```bash

@@ -353,7 +353,14 @@ function agent_api.action_use(agent)
     local target = agent_api.get_look_target(agent, 5)
     if target then
         log("debug", "Agent " .. agent.name .. " used/interacted with target")
-        -- Placeholder for future interaction logic
+        
+        -- Note: Basic interaction is logged but not yet implemented.
+        -- Future enhancements could include:
+        -- - Right-click simulation on nodes (opening chests, doors, etc.)
+        -- - Punching entities
+        -- - Using held items
+        -- Implementation depends on specific use cases and Luanti API capabilities.
+        
         return true
     end
     
@@ -392,19 +399,29 @@ end
 function agent_api.send_observation(agent, observation)
     if not agent then return end
     
-    -- This would be implemented with HTTP POST
-    -- For now, we'll store it for polling
+    -- Store observation for future use
     agent.last_observation = observation
     agent.last_observation_time = minetest.get_us_time()
+    
+    -- Note: Observation pushing to Python is not yet implemented.
+    -- Currently, the Python side polls for commands, and observations
+    -- are stored locally. Future enhancement could include a POST endpoint
+    -- on the Python server to receive observations.
 end
 
 -- Poll Python server for action commands
 function agent_api.poll_commands(agent)
     if not agent then return end
     
+    local http_api = minetest.request_http_api()
+    if not http_api then
+        log("error", "HTTP API not available. Check secure.http_mods setting.")
+        return
+    end
+    
     local url = agent_api.config.bot_server_url .. "/next"
     
-    minetest.request_http_api():fetch({
+    http_api:fetch({
         url = url,
         timeout = 1,
         method = "GET",
@@ -417,8 +434,10 @@ function agent_api.poll_commands(agent)
                     agent_api.execute_action(agent, cmd)
                 end
             end
+        elseif not result.succeeded then
+            log("debug", "Poll failed: " .. (result.error or "unknown error"))
         else
-            log("debug", "Poll failed: " .. tostring(result.code))
+            log("debug", "Poll returned code: " .. tostring(result.code))
         end
     end)
 end
