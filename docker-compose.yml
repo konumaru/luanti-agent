@@ -17,4 +17,5 @@ services:
       - ./config:/config-templates:ro
       - ./scripts:/scripts:ro
       - ./scripts/lsio-init-world.sh:/custom-cont-init.d/10-init-world.sh:ro
+      - ./mods:/config/.minetest/mods:ro
     restart: unless-stopped

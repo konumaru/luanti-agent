@@ -212,7 +212,7 @@ player_backend = sqlite3
 backend = sqlite3
 gameid = $GAME_ID
 world_name = $WORLD_NAME
-load_mod_python_bot = true
+load_mod_agent_api = true
 EOF
     fi
 else

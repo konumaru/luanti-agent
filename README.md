@@ -1,17 +1,130 @@
 # luanti-agent
 
-Reproducible Luanti server for agent experiments.
+Reproducible Luanti server for agent experiments with native Agent Control & Observation API.
+
+## Features
+
+- **Docker-based Luanti server** with reproducible world generation
+- **Agent API Lua mod** for AI agent control and observation
+- **Python client library** for controlling agents
+- **Observe → Act control loop** with minimal interface
+- **Extensible architecture** for AI experiments
 
 ## Quick start
 
 ```bash
 git clone https://github.com/konumaru/luanti-agent.git
 cd luanti-agent
-docker compose up
-docker compose logs -f
+
+# Start Luanti server
+docker compose up -d
+
+# In another terminal, start the Python bot server
+cd agent
+python bot_server.py
+
+# In yet another terminal, run an example agent
+python example_control_loop.py wander
 ```
 
 Server: `localhost:30000/udp`
+
+## Architecture
+
+```
+┌─────────────────┐         HTTP         ┌──────────────────┐
+│  Luanti Server  │◄────────────────────▶│  Python Process  │
+│   (Lua Mod)     │   Poll commands      │                  │
+│  agent_api      │   Send observations  │  bot_server.py   │
+│                 │                      │  agent_client.py │
+└─────────────────┘                      └──────────────────┘
+```
+
+### Components
+
+1. **Luanti Server** (Docker): Game server with agent_api mod
+2. **agent_api Mod** (Lua): Server-side agent management, observation, and action execution
+3. **bot_server.py** (Python): HTTP server for command queuing
+4. **agent_client.py** (Python): Client library for controlling agents
+5. **example_control_loop.py** (Python): Example agent behaviors
+
+## Agent API
+
+The Agent API provides:
+
+### Observation
+- Position & orientation
+- Surrounding blocks (configurable radius)
+- Nearby entities
+- Vision (raycast-based look target)
+- Health & state
+
+### Actions
+- Movement (forward, backward, left, right, up, down)
+- Rotation (relative or absolute)
+- Dig/mine blocks
+- Place blocks
+- Use/interact
+
+### Communication
+- HTTP-based polling from Lua to Python
+- Command queue for action sequencing
+- Type-safe Python data structures
+
+See [API.md](API.md) for complete documentation.
+
+## Usage
+
+### Creating an Agent
+
+In-game (requires server privilege):
+```
+/agent_create MyAgent
+```
+
+From Python:
+```python
+from agent_client import AgentClient, MoveAction
+
+client = AgentClient("http://localhost:8000")
+client.send_action(MoveAction("forward", speed=1.0))
+```
+
+### Example Behaviors
+
+```bash
+# Wandering agent
+python example_control_loop.py wander
+
+# Mining agent
+python example_control_loop.py mine
+
+# Building agent
+python example_control_loop.py build
+```
+
+## Configuration
+
+### Agent API Settings
+
+Add to `config/minetest.conf.template`:
+
+```ini
+agent_api.bot_server_url = http://host.docker.internal:8000
+agent_api.poll_interval = 0.2
+agent_api.agent_name = AIAgent
+agent_api.debug = false
+```
+
+### Security Settings
+
+Required for HTTP communication:
+
+```ini
+secure.enable_security = true
+secure.trusted_mods = agent_api
+secure.http_mods = agent_api
+```
 
 ## Data and init
 
