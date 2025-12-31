@@ -18,6 +18,7 @@ mkdir -p "$TEMP_DIR"
 download_contentdb_game() {
     local game_name="$1"
     local author="$2"
+    local release_id="${3:-}"
     
     # Validate parameters contain only safe characters
     if ! [[ "$game_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
@@ -29,6 +30,11 @@ download_contentdb_game() {
         return 1
     fi
     
+    if [ -n "$release_id" ] && ! [[ "$release_id" =~ ^[0-9]+$ ]]; then
+        echo "  Error: Invalid release id: $release_id"
+        return 1
+    fi
+
     echo "Downloading game: $game_name from ContentDB (author: $author)"
     
     if [ -d "$GAMES_DIR/$game_name" ]; then
@@ -37,7 +43,10 @@ download_contentdb_game() {
     fi
     
     # Download from ContentDB
-    local url="https://content.minetest.net/packages/${author}/${game_name}/download/"
+    local url="https://content.luanti.org/packages/${author}/${game_name}/download/"
+    if [ -n "$release_id" ]; then
+        url="https://content.luanti.org/packages/${author}/${game_name}/releases/${release_id}/download/"
+    fi
     
     cd "$TEMP_DIR"
     wget -q "$url" -O "${game_name}.zip" || {
@@ -107,12 +116,12 @@ echo ""
 echo "Starting game downloads..."
 echo ""
 
-# Download MineClone2 game from official Git repository
+# Download MineClone2 game from ContentDB release
 # Note: Requires network access. If running in offline environment,
 # place the game manually in $GAMES_DIR/mineclone2/
-download_git_game "mineclone2" "https://git.minetest.land/MineClone2/MineClone2.git" "master"
+download_contentdb_game "mineclone2" "Wuzzy" "34113"
 
-# Alternative: Download from ContentDB
+# Alternative: Download the latest ContentDB release without pinning
 # download_contentdb_game "mineclone2" "Wuzzy"
 
 echo ""

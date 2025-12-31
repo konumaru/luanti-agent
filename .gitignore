@@ -1,3 +1,4 @@
+<<<<<<< ours
 # Minetest/Luanti runtime data
 data/worlds/*/map.sqlite
 data/worlds/*/map.sqlite-shm
@@ -39,3 +40,7 @@ agent/venv/
 # OS
 .DS_Store
 Thumbs.db
+=======
+/data/worlds/
+/data/debug.txt
+>>>>>>> theirs

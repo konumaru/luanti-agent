@@ -43,7 +43,7 @@ On first run, the initialization script (`scripts/init-world.sh`) automatically:
 5. Downloads and installs mods (if configured)
 6. Configures game settings (damage, creative mode, etc.)
 
-**Note**: MineClone2 is downloaded from the official Git repository on first startup. If running in an offline environment or if the download fails, you can manually place the MineClone2 game files in `data/games/mineclone2/`.
+**Note**: MineClone2 is downloaded from ContentDB on first startup (current pin: release `34113`). If running in an offline environment or if the download fails, you can manually place the MineClone2 game files in `data/games/mineclone2/`.
 
 ### Configuration Templates
 
@@ -135,6 +135,7 @@ load_mod_worldedit = true
 The default game is MineClone2. To use a different game:
 
 1. Edit `docker-compose.yml` and change `GAME_ID`:
+
    ```yaml
    environment:
      - GAME_ID=minetest_game  # or another game
@@ -148,7 +149,7 @@ The default game is MineClone2. To use a different game:
 
 If automatic download fails or you're in an offline environment:
 
-1. Download MineClone2 manually from https://git.minetest.land/MineClone2/MineClone2
+1. Download MineClone2 manually from https://content.luanti.org/packages/Wuzzy/mineclone2/releases/34113/download/
 2. Extract it to `data/games/mineclone2/`
 3. Ensure the directory contains `game.conf` and `mods/` subdirectory
 4. Start the server: `docker compose up -d`
@@ -174,6 +175,7 @@ If automatic download fails or you're in an offline environment:
 ├── docker-compose.yml             # Docker Compose configuration
 └── docker-entrypoint.sh           # Container entry point script
 ```
+
 ```
 
 ## Development
