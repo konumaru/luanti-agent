@@ -1,0 +1,18 @@
+# World Configuration Template
+# This file defines the world settings and enabled mods
+
+enable_damage = true
+creative_mode = false
+mod_storage_backend = sqlite3
+auth_backend = sqlite3
+player_backend = sqlite3
+backend = sqlite3
+gameid = voxelibre
+world_name = world
+
+# Enabled Mods
+# python_bot is required for AI agent experiments via HTTP
+# load_mod_python_bot = true
+
+# Add more mods here as needed
+# load_mod_mobname = true

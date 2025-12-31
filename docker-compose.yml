@@ -6,9 +6,15 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Etc/UTC
-      - "CLI_ARGS=--gameid devtest" #optional
-    volumes:
-      - ./data:/config/.minetest
+      - WORLD_NAME=world
+      - GAME_ID=voxelibre
+      - FIXED_SEED=12345678
+      - "CLI_ARGS=--gameid voxelibre --worldname world"
     ports:
       - 30000:30000/udp
+    volumes:
+      - ./data:/config
+      - ./config:/config-templates:ro
+      - ./scripts:/scripts:ro
+      - ./scripts/lsio-init-world.sh:/custom-cont-init.d/10-init-world.sh:ro
     restart: unless-stopped
