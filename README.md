@@ -2,6 +2,12 @@
 
 Reproducible Luanti server for agent experiments with native Agent Control & Observation API.
 
+## Quick Links
+
+- **[Quick Start Guide](QUICKSTART.md)** - Get up and running in 5 minutes
+- **[API Documentation](API.md)** - Complete API reference
+- **[Agent Mod README](mods/agent_api/README.md)** - Lua mod details
+
 ## Features
 
 - **Docker-based Luanti server** with reproducible world generation
