@@ -6,7 +6,7 @@ set -euo pipefail
 
 DATA_DIR="${DATA_DIR:-}"
 if [ -z "$DATA_DIR" ]; then
-    if [ -d "/config/.minetest" ]; then
+    if [ -d "/config" ]; then
         DATA_DIR="/config/.minetest"
     else
         DATA_DIR="/root/.minetest"
