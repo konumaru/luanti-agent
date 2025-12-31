@@ -7,12 +7,12 @@ mod_storage_backend = sqlite3
 auth_backend = sqlite3
 player_backend = sqlite3
 backend = sqlite3
-gameid = mineclone2
+gameid = voxelibre
 world_name = world
 
 # Enabled Mods
 # python_bot is required for AI agent experiments via HTTP
-load_mod_python_bot = true
+# load_mod_python_bot = true
 
 # Add more mods here as needed
 # load_mod_mobname = true

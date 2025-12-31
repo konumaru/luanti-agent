@@ -18,7 +18,7 @@ This project provides a Dockerized Luanti server designed for AI agent experimen
 git clone https://github.com/konumaru/luanti-agent.git
 cd luanti-agent
 
-# Start the server (builds and initializes automatically)
+# Start the server (pulls the image and initializes automatically)
 docker compose up -d
 
 # View logs
@@ -36,14 +36,16 @@ The server will be available at `localhost:30000` (UDP).
 
 On first run, the initialization script (`scripts/init-world.sh`) automatically:
 
-1. Downloads and installs MineClone2 game (requires network access)
-2. Creates the world directory structure
-3. Copies configuration from templates
-4. Sets fixed map seed (12345678) for reproducibility
-5. Downloads and installs mods (if configured)
+1. Creates the world directory structure
+2. Copies configuration from templates
+3. Sets fixed map seed (12345678) for reproducibility
+4. Ensures the VoxeLibre game is present (downloaded if missing)
+5. Creates mods directory (mods are loaded if present)
 6. Configures game settings (damage, creative mode, etc.)
 
-**Note**: MineClone2 is downloaded from ContentDB on first startup (current pin: release `34113`). If running in an offline environment or if the download fails, you can manually place the MineClone2 game files in `data/games/mineclone2/`.
+**Note**: VoxeLibre is downloaded on first run into `/config/.minetest/games/voxelibre`. For offline use or different games, place files in `./data/.minetest/games/<gameid>` or set `GAME_REPO_URL`.
+
+For the LinuxServer image, `scripts/lsio-init-world.sh` is mounted into `/custom-cont-init.d` to run initialization at container start.
 
 ### Configuration Templates
 
@@ -56,7 +58,7 @@ Templates are located in the `config/` directory:
 
 Default configuration:
 
-- **Game ID**: mineclone2 (Minecraft-like game for Minetest)
+- **Game ID**: voxelibre (VoxeLibre game)
 - **Map Seed**: 12345678 (fixed for reproducibility)
 - **Map Generator**: v7 (with caves, dungeons, decorations)
 - **Damage**: Enabled
@@ -75,7 +77,7 @@ services:
   luanti:
     environment:
       - WORLD_NAME=world
-      - GAME_ID=mineclone2
+      - GAME_ID=voxelibre
       - FIXED_SEED=98765432
 ```
 
@@ -89,31 +91,25 @@ docker compose run -e FIXED_SEED=98765432 luanti
 
 To customize other world settings:
 
-1. Edit `config/minetest.conf.template` before building
-2. Rebuild the Docker image: `docker compose build`
-3. Remove existing world data: `rm -rf data/worlds/world/*.sqlite data/worlds/world/*.txt`
-4. Start the server: `docker compose up -d`
+1. Edit `config/minetest.conf.template`
+2. Stop the container: `docker compose down`
+3. Remove `./data/.minetest/minetest.conf` (and `./data/.minetest/worlds/<world>/world.mt` if you want it regenerated)
+4. Start the container: `docker compose up -d`
 
 ## Mod Management
 
 ### Adding Mods
 
-Mods can be added by editing `scripts/download-mods.sh`:
+Mods can be added by cloning into `./data/.minetest/mods` on the host (mounted at `/config/.minetest/mods`):
 
 ```bash
-# Example: Add mob mods from ContentDB
-download_contentdb_mod "mobs_redo" "TenPlus1"
-download_contentdb_mod "mobs_animal" "TenPlus1"
-download_contentdb_mod "mobs_monster" "TenPlus1"
-
-# Example: Add mods from GitHub
-download_github_mod "worldedit" "https://github.com/Uberi/Minetest-WorldEdit.git" "master"
+# Example: Add a mod from Git
+git clone --depth 1 https://github.com/Uberi/Minetest-WorldEdit.git ./data/.minetest/mods/worldedit
 ```
 
 After editing:
 
-1. Rebuild: `docker compose build`
-2. Restart: `docker compose up -d`
+1. Restart: `docker compose up -d`
 
 ### Enabling Mods
 
@@ -124,35 +120,30 @@ load_mod_mobname = true
 load_mod_worldedit = true
 ```
 
+If the world already exists, edit `./data/.minetest/worlds/<world>/world.mt` instead and restart.
+
 ### Currently Included Mods
 
-- **python_bot**: HTTP-controlled bot for AI agent experiments (in `data/mods/python_bot/`)
+- **python_bot**: HTTP-controlled bot for AI agent experiments (place it in `./data/.minetest/mods/python_bot/`)
 
 ## Game Management
 
 ### Changing Games
 
-The default game is MineClone2. To use a different game:
+The default game is VoxeLibre. To use a different game:
 
-1. Edit `docker-compose.yml` and change `GAME_ID`:
-
-   ```yaml
-   environment:
-     - GAME_ID=minetest_game  # or another game
-   ```
-
-2. Edit `scripts/download-games.sh` to download your preferred game
-
-3. Update `config/world.mt.template` to set the correct `gameid`
+1. Edit `docker-compose.yml` and change `GAME_ID` to match the game folder name
+2. Set `GAME_REPO_URL` (and optionally `GAME_REPO_BRANCH`) if you want auto-download
+3. Remove `./data/.minetest/games/<gameid>` if you want a fresh download
+4. Restart the container: `docker compose up -d`
 
 ### Manual Game Installation
 
-If automatic download fails or you're in an offline environment:
+If you're in an offline environment:
 
-1. Download MineClone2 manually from https://content.luanti.org/packages/Wuzzy/mineclone2/releases/34113/download/
-2. Extract it to `data/games/mineclone2/`
-3. Ensure the directory contains `game.conf` and `mods/` subdirectory
-4. Start the server: `docker compose up -d`
+1. Place the game files under `./data/.minetest/games/<gameid>`
+2. Ensure the directory contains `game.conf` and `mods/`
+3. Start the server: `docker compose up -d`
 
 ## Project Structure
 
@@ -163,20 +154,15 @@ If automatic download fails or you're in an offline environment:
 │   └── world.mt.template          # World metadata template
 ├── scripts/
 │   ├── init-world.sh              # World initialization script
-│   ├── download-mods.sh           # Mod download/management script
-│   └── download-games.sh          # Game download/management script
-├── data/
-│   ├── mods/                      # Installed mods
-│   ├── worlds/                    # World data (generated)
-│   ├── games/                     # Game definitions (mineclone2)
-│   └── minetest.conf              # Active server config (generated)
+│   ├── lsio-init-world.sh          # LinuxServer init wrapper
+│   ├── download-mods.sh           # Optional legacy helper script
+│   └── download-games.sh          # Optional legacy helper script
 ├── agent/                         # AI agent Python code
-├── Dockerfile                     # Custom Luanti server image
+├── Dockerfile                     # Optional legacy image build
 ├── docker-compose.yml             # Docker Compose configuration
 └── docker-entrypoint.sh           # Container entry point script
 ```
-
-```
+Container user data lives on the host in `./data/.minetest` (mounted at `/config/.minetest`).
 
 ## Development
 
@@ -188,8 +174,8 @@ To start with a fresh world (same seed, clean state):
 # Stop the server
 docker compose down
 
-# Remove world data (keeps config and mods)
-rm -rf data/worlds/world/*.sqlite data/worlds/world/*.txt data/worlds/world/*.png
+# Remove world data
+rm -rf ./data/.minetest/worlds/world
 
 # Restart
 docker compose up -d
@@ -206,7 +192,6 @@ docker compose up -d
 To test the initialization without running the server:
 
 ```bash
-docker compose build
 docker compose run --rm luanti /scripts/init-world.sh
 ```
 
@@ -232,9 +217,15 @@ See `agent/` directory for the Python agent implementation.
 
 - This is designed for **experimental/development use**
 - World data (SQLite databases, player data) is excluded from git
-- The `mineclone2` game is used by default (Minecraft-like experience)
-- MineClone2 is automatically downloaded from ContentDB on first run
+- The `voxelibre` game is used by default (VoxeLibre)
+- VoxeLibre is downloaded on first run (see `GAME_REPO_URL`)
 - Mods can be added without modifying core files
+
+If you see permission errors writing to `/config/.minetest`, ensure `./data` is owned by `PUID:PGID` (defaults `1000:1000`):
+
+```bash
+sudo chown -R 1000:1000 ./data
+```
 
 ## License
 
