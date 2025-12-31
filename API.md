@@ -50,21 +50,23 @@ The Agent API provides a Luanti-native interface for AI agent control and observ
 
 ### Agent Management
 
-#### `agent_api.create_agent(pos, name)`
+#### `agent_api.create_agent(player_name)`
 
-Create a new agent entity.
+Attach agent control to an existing player.
 
 **Parameters:**
-- `pos` (table): Initial position `{x=0, y=10, z=0}`
-- `name` (string, optional): Agent name (default: from config)
+- `player_name` (string): Name of the player to control
 
 **Returns:**
 - Agent object or `nil` on failure
 
 **Example:**
 ```lua
-local agent = agent_api.create_agent({x=0, y=10, z=0}, "MyAgent")
+local agent = agent_api.create_agent("PlayerName")
 ```
+
+**Note:** The player must be online for this to work. Agents are automatically
+cleaned up when players leave the server.
 
 #### `agent_api.get_agent(name)`
 
@@ -276,12 +278,11 @@ Execute an action command.
 ### Chat Commands
 
 ```
-/agent_create [name]  - Create an AI agent
-/agent_remove <name>  - Remove an agent
-/agent_list           - List all active agents
+/agent_create           - Create AI agent control for yourself
+/agent_attach <player>  - Attach agent to another player (requires server privilege)
+/agent_remove [player]  - Remove agent control from player (defaults to self)
+/agent_list             - List all active agents
 ```
-
-Requires `server` privilege.
 
 ## Python API Reference
 
@@ -422,8 +423,8 @@ for i in range(5):
 ### Lua: Manual Agent Creation
 
 ```lua
--- Create agent at spawn
-local agent = agent_api.create_agent({x=0, y=10, z=0}, "TestAgent")
+-- Attach agent control to a player
+local agent = agent_api.create_agent("PlayerName")
 
 -- Get observation
 local obs = agent_api.observe(agent)

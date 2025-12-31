@@ -32,6 +32,7 @@ secure.http_mods = agent_api
 agent_api.bot_server_url = http://host.docker.internal:8000
 agent_api.poll_interval = 0.2
 agent_api.agent_name = AIAgent
+agent_api.auto_create = false
 agent_api.debug = false
 
 # MOB Settings (for future mob mods)

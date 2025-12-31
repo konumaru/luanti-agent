@@ -77,17 +77,23 @@ See [API.md](API.md) for complete documentation.
 
 ### Creating an Agent
 
-In-game (requires server privilege):
-```
-/agent_create MyAgent
-```
+Agents are attached to existing player characters. You have two options:
 
-From Python:
-```python
-from agent_client import AgentClient, MoveAction
+**Option 1: Manual creation in-game**
+1. Join the Luanti server as a player
+2. Run `/agent_create` to enable agent control for your character
+3. The Python client can now control your player
 
-client = AgentClient("http://localhost:8000")
-client.send_action(MoveAction("forward", speed=1.0))
+**Option 2: Auto-creation on join**
+Set `agent_api.auto_create = true` in `config/minetest.conf.template` to automatically
+create an agent when a player named `agent_api.agent_name` joins.
+
+**Chat Commands:**
+```
+/agent_create           - Enable agent control for yourself
+/agent_attach <player>  - Attach agent to another player (requires server privilege)
+/agent_remove [player]  - Disable agent control (defaults to self)
+/agent_list             - List all active agents
 ```
 
 ### Example Behaviors
@@ -105,7 +111,7 @@ python example_control_loop.py build
 
 ## Configuration
 
-### Agent API Settings
+### Configuration
 
 Add to `config/minetest.conf.template`:
 
@@ -113,6 +119,7 @@ Add to `config/minetest.conf.template`:
 agent_api.bot_server_url = http://host.docker.internal:8000
 agent_api.poll_interval = 0.2
 agent_api.agent_name = AIAgent
+agent_api.auto_create = false
 agent_api.debug = false
 ```
 
@@ -124,6 +131,17 @@ Required for HTTP communication:
 secure.enable_security = true
 secure.trusted_mods = agent_api
 secure.http_mods = agent_api
+```
+
+## Python Control
+
+Once an agent is created in-game, you can control it from Python:
+
+```python
+from agent_client import AgentClient, MoveAction
+
+client = AgentClient("http://localhost:8000")
+client.send_action(MoveAction("forward", speed=1.0))
 ```
 
 ## Data and init

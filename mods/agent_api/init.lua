@@ -18,6 +18,9 @@ agent_api.config = {
 -- Active agents registry
 agent_api.agents = {}
 
+-- Auto-create agent for configured player on join
+agent_api.config.auto_create = minetest.settings:get_bool("agent_api.auto_create", false)
+
 -- Logging helper
 local function log(level, msg)
     local prefix = "[agent_api] "
@@ -28,25 +31,56 @@ local function log(level, msg)
 end
 
 -- ============================================================================
+-- Player Join Handling
+-- ============================================================================
+
+-- Auto-create agent for configured player
+minetest.register_on_joinplayer(function(player)
+    if agent_api.config.auto_create then
+        local name = player:get_player_name()
+        if name == agent_api.config.agent_name then
+            minetest.after(1.0, function()
+                agent_api.create_agent(name)
+                log("info", "Auto-created agent for: " .. name)
+            end)
+        end
+    end
+end)
+
+-- Clean up agent on player leave
+minetest.register_on_leaveplayer(function(player)
+    local name = player:get_player_name()
+    if agent_api.agents[name] then
+        agent_api.remove_agent(name)
+        log("info", "Agent removed on player leave: " .. name)
+    end
+end)
+
+-- ============================================================================
 -- Agent Entity Management
 -- ============================================================================
 
--- Create a new agent entity
-function agent_api.create_agent(pos, name)
-    name = name or agent_api.config.agent_name
-    
-    local player = minetest.add_player({
-        name = name,
-        initial_pos = pos or {x = 0, y = 10, z = 0},
-    })
-    
-    if not player then
-        log("error", "Failed to create agent: " .. name)
+-- Create a new agent by attaching to an existing player
+function agent_api.create_agent(player_name)
+    if not player_name then
+        log("error", "Cannot create agent: player_name is required")
         return nil
     end
     
+    local player = minetest.get_player_by_name(player_name)
+    if not player then
+        log("error", "Cannot create agent: player not found: " .. player_name)
+        return nil
+    end
+    
+    -- Check if agent already exists
+    if agent_api.agents[player_name] then
+        log("warning", "Agent already exists: " .. player_name)
+        return agent_api.agents[player_name]
+    end
+    
     local agent = {
-        name = name,
+        name = player_name,
         player = player,
         state = "idle",
         last_pos = player:get_pos(),
@@ -54,8 +88,8 @@ function agent_api.create_agent(pos, name)
         action_queue = {},
     }
     
-    agent_api.agents[name] = agent
-    log("info", "Agent created: " .. name)
+    agent_api.agents[player_name] = agent
+    log("info", "Agent created for player: " .. player_name)
     return agent
 end
 
@@ -67,8 +101,8 @@ end
 -- Remove agent
 function agent_api.remove_agent(name)
     local agent = agent_api.agents[name]
-    if agent and agent.player then
-        -- Clean up the player/entity
+    if agent then
+        -- Just remove from registry, don't remove the player
         agent_api.agents[name] = nil
         log("info", "Agent removed: " .. name)
         return true
@@ -423,48 +457,52 @@ end)
 -- ============================================================================
 
 minetest.register_chatcommand("agent_create", {
-    description = "Create an AI agent",
-    params = "[name]",
-    privs = {server = true},
+    description = "Create an AI agent from the calling player",
+    params = "",
     func = function(name, param)
-        local agent_name = param ~= "" and param or nil
-        local player = minetest.get_player_by_name(name)
-        if not player then
-            return false, "Player not found"
-        end
-        
-        local pos = player:get_pos()
-        pos = vector.add(pos, {x = 2, y = 0, z = 0})
-        
-        local agent = agent_api.create_agent(pos, agent_name)
+        local agent = agent_api.create_agent(name)
         if agent then
-            return true, "Agent created: " .. agent.name
+            return true, "Agent created for player: " .. agent.name
         else
             return false, "Failed to create agent"
         end
     end,
 })
 
-minetest.register_chatcommand("agent_remove", {
-    description = "Remove an AI agent",
-    params = "<name>",
+minetest.register_chatcommand("agent_attach", {
+    description = "Attach agent to another player (requires server privilege)",
+    params = "<player_name>",
     privs = {server = true},
     func = function(name, param)
         if param == "" then
-            return false, "Usage: /agent_remove <name>"
+            return false, "Usage: /agent_attach <player_name>"
         end
         
-        if agent_api.remove_agent(param) then
-            return true, "Agent removed: " .. param
+        local agent = agent_api.create_agent(param)
+        if agent then
+            return true, "Agent attached to player: " .. agent.name
         else
-            return false, "Agent not found: " .. param
+            return false, "Failed to attach agent to player: " .. param
+        end
+    end,
+})
+
+minetest.register_chatcommand("agent_remove", {
+    description = "Remove AI agent control from a player",
+    params = "[player_name]",
+    func = function(name, param)
+        local target_name = param ~= "" and param or name
+        
+        if agent_api.remove_agent(target_name) then
+            return true, "Agent removed: " .. target_name
+        else
+            return false, "Agent not found: " .. target_name
         end
     end,
 })
 
 minetest.register_chatcommand("agent_list", {
     description = "List all agents",
-    privs = {server = true},
     func = function(name, param)
         local count = 0
         local list = ""

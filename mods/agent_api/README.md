@@ -47,18 +47,17 @@ secure.http_mods = agent_api
 ### Chat Commands
 
 ```
-/agent_create [name]    - Create a new AI agent
-/agent_remove <name>    - Remove an agent
+/agent_create           - Create AI agent control for yourself
+/agent_attach <player>  - Attach agent to another player (requires server privilege)
+/agent_remove [player]  - Remove agent control from player (defaults to self)
 /agent_list             - List all active agents
 ```
-
-Requires `server` privilege.
 
 ### Lua API
 
 ```lua
--- Create an agent
-local agent = agent_api.create_agent({x=0, y=10, z=0}, "MyAgent")
+-- Attach agent control to an existing player
+local agent = agent_api.create_agent("PlayerName")
 
 -- Get observations
 local obs = agent_api.observe(agent)
