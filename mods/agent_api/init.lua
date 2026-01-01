@@ -231,17 +231,21 @@ function agent_api.get_nearby_entities(agent, radius)
             local entity_data = {
                 pos = entity_pos,
                 distance = vector.distance(pos, entity_pos),
-                name = obj:get_entity_name() or "unknown",
+                name = "unknown",
             }
-            
-            -- Try to get additional info if it's a player
+
             if obj:is_player() then
                 entity_data.type = "player"
                 entity_data.player_name = obj:get_player_name()
+                entity_data.name = entity_data.player_name
             else
                 entity_data.type = "entity"
+                local luaentity = obj:get_luaentity()
+                if luaentity and luaentity.name then
+                    entity_data.name = luaentity.name
+                end
             end
-            
+
             table.insert(entities, entity_data)
         end
     end
