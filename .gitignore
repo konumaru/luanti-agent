@@ -26,6 +26,10 @@ env/
 ENV/
 env.bak/
 venv.bak/
+.venv/
+
+# uv
+.uv/
 
 # IDE
 .vscode/

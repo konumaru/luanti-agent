@@ -11,9 +11,15 @@ Python client for controlling AI agents in Luanti via the agent_api mod.
 
 ## Installation
 
+This project uses [uv](https://docs.astral.sh/uv/) for dependency management.
+
 ```bash
+# Install uv if you haven't already
+pip install uv
+
+# Install dependencies
 cd agent
-pip install -e .
+uv sync
 ```
 
 ## Quick Start
@@ -21,7 +27,7 @@ pip install -e .
 ### Running the Bot Server
 
 ```bash
-python bot_server.py
+uv run python bot_server.py
 ```
 
 This starts an HTTP server on port 8000 that the Luanti mod will poll for commands.
@@ -30,13 +36,13 @@ This starts an HTTP server on port 8000 that the Luanti mod will poll for comman
 
 ```bash
 # Wandering agent
-python example_control_loop.py wander
+uv run python example_control_loop.py wander
 
 # Mining agent
-python example_control_loop.py mine
+uv run python example_control_loop.py mine
 
 # Building agent
-python example_control_loop.py build
+uv run python example_control_loop.py build
 ```
 
 ## Usage

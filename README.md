@@ -27,10 +27,11 @@ docker compose up -d
 
 # In another terminal, start the Python bot server
 cd agent
-python bot_server.py
+uv sync  # Install dependencies with uv
+uv run python bot_server.py
 
 # In yet another terminal, run an example agent
-python example_control_loop.py wander
+uv run python example_control_loop.py wander
 ```
 
 Server: `localhost:30000/udp`
@@ -123,13 +124,13 @@ Observation feedback will be added in future updates.
 
 ```bash
 # Wandering agent
-python example_control_loop.py wander
+uv run python example_control_loop.py wander
 
 # Mining agent
-python example_control_loop.py mine
+uv run python example_control_loop.py mine
 
 # Building agent
-python example_control_loop.py build
+uv run python example_control_loop.py build
 ```
 
 ## Configuration

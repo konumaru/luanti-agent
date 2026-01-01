@@ -31,8 +31,12 @@ In a new terminal:
 
 ```bash
 cd agent
-pip install -e .
-python bot_server.py
+# Install uv if you haven't already
+pip install uv
+
+# Install dependencies and run bot server
+uv sync
+uv run python bot_server.py
 ```
 
 This starts an HTTP server on `localhost:8000` that the Luanti mod will poll for commands.
@@ -70,13 +74,13 @@ Your player character should now start moving and rotating automatically!
 
 ```bash
 # Wandering behavior (moves and rotates)
-python example_control_loop.py wander
+uv run python example_control_loop.py wander
 
 # Mining behavior (digs blocks in front)
-python example_control_loop.py mine
+uv run python example_control_loop.py mine
 
 # Building behavior (places blocks upward)
-python example_control_loop.py build
+uv run python example_control_loop.py build
 ```
 
 ## Writing Your Own Control Script
@@ -106,7 +110,7 @@ print("Done!")
 
 Run it:
 ```bash
-python my_script.py
+uv run python my_script.py
 ```
 
 ## Troubleshooting
