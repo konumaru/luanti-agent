@@ -79,6 +79,52 @@ LookAtAction(yaw=1.57, pitch=0.0)  # Absolute direction
 DigAction()  # Dig block at look target
 PlaceAction("default:stone")  # Place block
 UseAction()  # Interact with target
+
+# Observation control
+SetObservationOptionsAction(filter_occluded_blocks=True)  # Filter underground blocks
+SetObservationOptionsAction(filter_occluded_blocks=False)  # See all blocks
+
+# Communication
+ChatAction("Hello, world!")  # Send chat message
+```
+
+### New Features
+
+**Visibility Filtering**
+
+Control whether the agent can see blocks that are underground (occluded by other blocks):
+
+```python
+# Enable filtering - only see visible blocks (realistic vision)
+client.send_action(SetObservationOptionsAction(filter_occluded_blocks=True))
+
+# Disable filtering - see all blocks including underground (x-ray vision)
+client.send_action(SetObservationOptionsAction(filter_occluded_blocks=False))
+```
+
+**Chat Communication**
+
+Make your agent send messages in the game chat:
+
+```python
+client.send_action(ChatAction("Hello from the AI agent!"))
+client.send_action(ChatAction("I found some diamonds!"))
+```
+
+### Example: New Features Demo
+
+```bash
+# Visibility filtering demo
+uv run python example_new_features.py visibility
+
+# Chat demo
+uv run python example_new_features.py chat
+
+# Combined demo (movement + visibility + chat)
+uv run python example_new_features.py combined
+```
+
+UseAction()  # Interact with target
 ```
 
 ### Observations

@@ -90,6 +90,8 @@ function agent_api.create_agent(player_name)
         last_pos = player:get_pos(),
         last_look_dir = player:get_look_dir(),
         action_queue = {},
+        -- Observation settings
+        filter_occluded_blocks = false,  -- Whether to filter out blocks not visible due to occlusion
     }
     
     agent_api.agents[player_name] = agent
@@ -138,6 +140,33 @@ function agent_api.get_orientation(agent)
     }
 end
 
+-- Check if a block is visible from agent's eye position (not occluded)
+local function is_block_visible(agent, block_pos)
+    local eye_pos = vector.add(agent.player:get_pos(), {x = 0, y = PLAYER_EYE_HEIGHT, z = 0})
+    local block_center = vector.add(block_pos, {x = 0.5, y = 0.5, z = 0.5})
+    
+    -- Use raycast to check if there's a clear line of sight
+    local ray = minetest.raycast(eye_pos, block_center, false, false)
+    local pointed = ray:next()
+    
+    -- If raycast hits the exact block we're checking, it's visible
+    if pointed and pointed.type == "node" then
+        local hit_pos = pointed.under
+        -- Check if the hit position matches our target block
+        if vector.equals(hit_pos, block_pos) then
+            return true
+        end
+    end
+    
+    -- Also consider blocks very close to the agent as visible
+    local distance = vector.distance(eye_pos, block_center)
+    if distance < 1.5 then
+        return true
+    end
+    
+    return false
+end
+
 -- Get surrounding blocks (3x3x3 cube centered on agent)
 function agent_api.get_surrounding_blocks(agent, radius)
     if not agent or not agent.player then return nil end
@@ -152,12 +181,21 @@ function agent_api.get_surrounding_blocks(agent, radius)
             for z = -radius, radius do
                 local check_pos = vector.add(rounded_pos, {x = x, y = y, z = z})
                 local node = minetest.get_node(check_pos)
-                table.insert(blocks, {
-                    pos = check_pos,
-                    name = node.name,
-                    param1 = node.param1,
-                    param2 = node.param2,
-                })
+                
+                -- Apply visibility filter if enabled
+                local include_block = true
+                if agent.filter_occluded_blocks then
+                    include_block = is_block_visible(agent, check_pos)
+                end
+                
+                if include_block then
+                    table.insert(blocks, {
+                        pos = check_pos,
+                        name = node.name,
+                        param1 = node.param1,
+                        param2 = node.param2,
+                    })
+                end
             end
         end
     end
@@ -400,6 +438,34 @@ function agent_api.action_use(agent)
     return false
 end
 
+-- Set observation options
+function agent_api.action_set_observation_options(agent, options)
+    if not agent or not options then return false end
+    
+    if options.filter_occluded_blocks ~= nil then
+        agent.filter_occluded_blocks = options.filter_occluded_blocks
+        log("debug", "Agent " .. agent.name .. " occlusion filter: " .. tostring(agent.filter_occluded_blocks))
+    end
+    
+    return true
+end
+
+-- Send chat message
+function agent_api.action_chat(agent, message)
+    if not agent or not agent.player then return false end
+    
+    if not message or message == "" then
+        log("warning", "Agent " .. agent.name .. " tried to send empty chat message")
+        return false
+    end
+    
+    -- Send chat message from the agent
+    minetest.chat_send_all("<" .. agent.name .. "> " .. message)
+    log("debug", "Agent " .. agent.name .. " sent chat: " .. message)
+    
+    return true
+end
+
 -- Execute an action command
 function agent_api.execute_action(agent, action)
     if not agent or not action then return false end
@@ -418,6 +484,10 @@ function agent_api.execute_action(agent, action)
         return agent_api.action_place(agent, action.node_name)
     elseif action_type == "use" then
         return agent_api.action_use(agent)
+    elseif action_type == "set_observation_options" then
+        return agent_api.action_set_observation_options(agent, action.options)
+    elseif action_type == "chat" then
+        return agent_api.action_chat(agent, action.message)
     else
         log("warning", "Unknown action type: " .. tostring(action_type))
         return false

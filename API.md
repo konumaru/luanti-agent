@@ -247,6 +247,39 @@ Use/interact with target (placeholder).
 **Returns:**
 - `true` if successful
 
+#### `agent_api.action_set_observation_options(agent, options)`
+
+Set observation options for the agent.
+
+**Parameters:**
+- `options` (table): Options table
+  - `filter_occluded_blocks` (boolean, optional): If true, filter out blocks not visible due to occlusion
+
+**Returns:**
+- `true` if successful
+
+**Example:**
+```lua
+agent_api.action_set_observation_options(agent, {
+    filter_occluded_blocks = true
+})
+```
+
+#### `agent_api.action_chat(agent, message)`
+
+Send a chat message in the game.
+
+**Parameters:**
+- `message` (string): Message to send
+
+**Returns:**
+- `true` if successful
+
+**Example:**
+```lua
+agent_api.action_chat(agent, "Hello, world!")
+```
+
 #### `agent_api.execute_action(agent, action)`
 
 Execute an action command.
@@ -273,6 +306,12 @@ Execute an action command.
 
 -- Use
 {type = "use"}
+
+-- Set observation options
+{type = "set_observation_options", options = {filter_occluded_blocks = true}}
+
+-- Chat
+{type = "chat", message = "Hello!"}
 ```
 
 ### Chat Commands
@@ -341,6 +380,34 @@ Create a place action.
 #### `UseAction()`
 
 Create a use action.
+
+#### `SetObservationOptionsAction(filter_occluded_blocks=None)`
+
+Create an action to set observation options.
+
+**Parameters:**
+- `filter_occluded_blocks`: If True, filter out blocks not visible due to occlusion; if False, see all blocks
+
+**Example:**
+```python
+# Enable filtering (realistic vision)
+SetObservationOptionsAction(filter_occluded_blocks=True)
+
+# Disable filtering (x-ray vision)
+SetObservationOptionsAction(filter_occluded_blocks=False)
+```
+
+#### `ChatAction(message)`
+
+Create a chat action.
+
+**Parameters:**
+- `message`: The message to send in chat
+
+**Example:**
+```python
+ChatAction("Hello from the AI agent!")
+```
 
 ### AgentClient
 

@@ -12,6 +12,7 @@ Luanti-native API for AI agent control and observation.
 ### Observation API
 - **Position & Orientation**: Get agent's current position, yaw, pitch, and look direction
 - **Surrounding Blocks**: Query blocks in a radius around the agent
+- **Visibility Filtering**: Optional filtering of occluded (underground) blocks
 - **Nearby Entities**: Detect nearby entities and players
 - **Vision System**: Raycast-based look target detection
 
@@ -21,6 +22,8 @@ Luanti-native API for AI agent control and observation.
 - **Dig**: Mine/break blocks at look target
 - **Place**: Place blocks at look target
 - **Use**: Interact with objects (placeholder for extension)
+- **Observation Options**: Configure visibility filtering
+- **Chat**: Send messages in game chat
 
 ### Communication Layer
 - HTTP-based communication with Python server
@@ -84,6 +87,20 @@ agent_api.execute_action(agent, {
 agent_api.execute_action(agent, {
     type = "place",
     node_name = "default:dirt"
+})
+
+-- New: Set observation options
+agent_api.execute_action(agent, {
+    type = "set_observation_options",
+    options = {
+        filter_occluded_blocks = true  -- Only see visible blocks
+    }
+})
+
+-- New: Send chat message
+agent_api.execute_action(agent, {
+    type = "chat",
+    message = "Hello from Lua!"
 })
 ```
 

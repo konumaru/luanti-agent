@@ -227,6 +227,44 @@ class UseAction(Action):
         return {'type': 'use'}
 
 
+class SetObservationOptionsAction(Action):
+    """Set observation options for the agent"""
+    
+    def __init__(self, filter_occluded_blocks: Optional[bool] = None):
+        """
+        Args:
+            filter_occluded_blocks: If True, filter out blocks not visible due to occlusion
+        """
+        self.filter_occluded_blocks = filter_occluded_blocks
+    
+    def to_dict(self) -> Dict[str, Any]:
+        options = {}
+        if self.filter_occluded_blocks is not None:
+            options['filter_occluded_blocks'] = self.filter_occluded_blocks
+        
+        return {
+            'type': 'set_observation_options',
+            'options': options
+        }
+
+
+class ChatAction(Action):
+    """Send a chat message in the game"""
+    
+    def __init__(self, message: str):
+        """
+        Args:
+            message: The message to send in chat
+        """
+        self.message = message
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'type': 'chat',
+            'message': self.message
+        }
+
+
 class AgentClient:
     """Client for interacting with agent via the bot server"""
     

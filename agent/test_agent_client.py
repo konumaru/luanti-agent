@@ -21,6 +21,8 @@ def test_imports():
             DigAction,
             PlaceAction,
             UseAction,
+            SetObservationOptionsAction,
+            ChatAction,
         )
         print("✓ All imports successful")
         return True
@@ -91,7 +93,8 @@ def test_action_serialization():
     try:
         from agent_client import (
             MoveAction, RotateAction, LookAtAction,
-            DigAction, PlaceAction, UseAction
+            DigAction, PlaceAction, UseAction,
+            SetObservationOptionsAction, ChatAction
         )
         
         actions = [
@@ -101,12 +104,26 @@ def test_action_serialization():
             DigAction(),
             PlaceAction("default:stone"),
             UseAction(),
+            SetObservationOptionsAction(filter_occluded_blocks=True),
+            ChatAction("Hello from agent!"),
         ]
         
         for action in actions:
             action_dict = action.to_dict()
             assert 'type' in action_dict
             print(f"✓ {action.__class__.__name__} serialization works")
+        
+        # Test SetObservationOptionsAction specifically
+        obs_action = SetObservationOptionsAction(filter_occluded_blocks=False)
+        obs_dict = obs_action.to_dict()
+        assert obs_dict['type'] == 'set_observation_options'
+        assert obs_dict['options']['filter_occluded_blocks'] == False
+        
+        # Test ChatAction specifically
+        chat_action = ChatAction("Test message")
+        chat_dict = chat_action.to_dict()
+        assert chat_dict['type'] == 'chat'
+        assert chat_dict['message'] == "Test message"
         
         return True
     except Exception as e:
