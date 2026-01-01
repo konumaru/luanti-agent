@@ -6,6 +6,7 @@ agent_api = {}
 -- Constants
 local PLAYER_EYE_HEIGHT = 1.5  -- Player eye level offset for raycast
 local BLOCK_PLACE_OFFSET = {x = 0, y = 1, z = 0}  -- Default offset for block placement
+local CLOSE_VISIBILITY_RADIUS = 1.5  -- Distance within which blocks are always considered visible
 
 -- Configuration
 agent_api.config = {
@@ -160,7 +161,7 @@ local function is_block_visible(agent, block_pos)
     
     -- Also consider blocks very close to the agent as visible
     local distance = vector.distance(eye_pos, block_center)
-    if distance < 1.5 then
+    if distance < CLOSE_VISIBILITY_RADIUS then
         return true
     end
     

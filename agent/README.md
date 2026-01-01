@@ -124,9 +124,6 @@ uv run python example_new_features.py chat
 uv run python example_new_features.py combined
 ```
 
-UseAction()  # Interact with target
-```
-
 ### Observations
 
 ```python
