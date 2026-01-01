@@ -14,6 +14,7 @@ services:
     volumes:
       - ./data:/config
       - ./config/minetest.conf:/config/.minetest/main-config/minetest.conf
+      - ./config/minetest.conf:/config/.minetest/minetest.conf
       - ./config/world.mt:/config-static/world.mt:ro
       - ./scripts:/scripts:ro
       - ./scripts/lsio-init-world.sh:/custom-cont-init.d/10-init-world.sh:ro

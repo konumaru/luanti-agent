@@ -23,6 +23,8 @@ agent_api.config = {
 -- Active agents registry
 agent_api.agents = {}
 
+local http_api_unavailable_logged = false
+
 -- Auto-create agent for configured player on join
 agent_api.config.auto_create = minetest.settings:get_bool("agent_api.auto_create", false)
 
@@ -523,7 +525,13 @@ function agent_api.poll_commands(agent)
     
     local http_api = minetest.request_http_api()
     if not http_api then
-        log("error", "HTTP API not available. Add 'agent_api' to secure.http_mods in minetest.conf")
+        if not http_api_unavailable_logged then
+            http_api_unavailable_logged = true
+            log("error", "HTTP API not available. Add 'agent_api' to secure.http_mods in minetest.conf")
+            log("error", "secure.enable_security=" .. tostring(minetest.settings:get_bool("secure.enable_security")) ..
+                " secure.http_mods=" .. tostring(minetest.settings:get("secure.http_mods")) ..
+                " secure.trusted_mods=" .. tostring(minetest.settings:get("secure.trusted_mods")))
+        end
         return
     end
     
