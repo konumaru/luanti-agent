@@ -11,7 +11,7 @@ local CLOSE_VISIBILITY_RADIUS = 1.5  -- Distance within which blocks are always 
 -- Configuration
 agent_api.config = {
     -- Python bot server URL (can be overridden via minetest.conf)
-    bot_server_url = minetest.settings:get("agent_api.bot_server_url") or "http://host.docker.internal:8000",
+    bot_server_url = minetest.settings:get("agent_api.bot_server_url") or "http://bot:8000",
     -- Polling interval in seconds
     poll_interval = tonumber(minetest.settings:get("agent_api.poll_interval")) or 0.2,
     -- Agent name
@@ -34,6 +34,10 @@ local function log(level, msg)
     end
     minetest.log(level, prefix .. msg)
 end
+
+log("info", "secure.enable_security=" .. tostring(minetest.settings:get_bool("secure.enable_security")) ..
+    " secure.http_mods=" .. tostring(minetest.settings:get("secure.http_mods")) ..
+    " secure.trusted_mods=" .. tostring(minetest.settings:get("secure.trusted_mods")))
 
 -- ============================================================================
 -- Player Join Handling

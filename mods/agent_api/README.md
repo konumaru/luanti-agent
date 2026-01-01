@@ -36,7 +36,7 @@ Add to `minetest.conf`:
 
 ```ini
 # Agent API Configuration
-agent_api.bot_server_url = http://host.docker.internal:8000
+agent_api.bot_server_url = http://bot:8000
 agent_api.poll_interval = 0.2
 agent_api.agent_name = AIAgent
 agent_api.debug = false
@@ -44,6 +44,8 @@ agent_api.debug = false
 # Security settings (required for HTTP)
 secure.http_mods = agent_api
 ```
+
+If you run the bot server on your host, set `agent_api.bot_server_url = http://host.docker.internal:8000`.
 
 ## Usage
 

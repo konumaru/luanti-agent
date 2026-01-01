@@ -26,11 +26,20 @@ uv sync
 
 ### Running the Bot Server
 
+If you use `docker compose`, the FastAPI bot server starts automatically.
+
 ```bash
 uv run python bot_server.py
 ```
 
 This starts an HTTP server on port 8000 that the Luanti mod will poll for commands.
+
+To run the FastAPI version locally:
+
+```bash
+pip install -r requirements.server.txt
+uvicorn bot_server_fastapi:app --host 0.0.0.0 --port 8000
+```
 
 ### Example Control Loop
 
@@ -161,11 +170,14 @@ if obs:
 The Luanti mod can be configured via `minetest.conf`:
 
 ```ini
-agent_api.bot_server_url = http://host.docker.internal:8000
+agent_api.bot_server_url = http://bot:8000
 agent_api.poll_interval = 0.2
 agent_api.agent_name = AIAgent
 agent_api.debug = false
 ```
+
+When using Docker Compose, the bot service is reachable at `http://bot:8000`.
+If you run the bot server on your host, set `agent_api.bot_server_url = http://host.docker.internal:8000`.
 
 ## Development
 
@@ -175,9 +187,11 @@ agent_api.debug = false
 agent/
 ├── agent_client.py          # Main client API
 ├── bot_server.py            # HTTP server for command queue
+├── bot_server_fastapi.py    # FastAPI server for command queue
 ├── example_control_loop.py  # Example behaviors
 ├── main.py                  # Entry point
 ├── pyproject.toml           # Package configuration
+├── requirements.server.txt  # FastAPI server dependencies
 └── README.md                # This file
 ```
 

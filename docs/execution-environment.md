@@ -124,7 +124,7 @@ It is intentionally implementation-agnostic and should be agreed on before chang
 - Treat `config/world.mt` as authoritative, but copy only on first world creation.
 - Bot server is mandatory only for local compose; in production it is separate.
 - Bot server is always required logically, but deployed separately in production.
-- `BOT_SERVER_URL` remains an explicit configuration for all non-compose deploys.
+- `agent_api.bot_server_url` remains an explicit configuration for all non-compose deploys.
 - Multiple worlds are not supported in this runtime.
 - Luanti and bot are built as separate images and deploy independently.
 

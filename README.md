@@ -22,19 +22,22 @@ Reproducible Luanti server for agent experiments with native Agent Control & Obs
 git clone https://github.com/konumaru/luanti-agent.git
 cd luanti-agent
 
-# Start Luanti server
-docker compose up -d
+# Start Luanti + bot server
+make up
 
-# In another terminal, start the Python bot server
+# (Optional) Run the bot server on your host instead of Docker
 cd agent
 uv sync  # Install dependencies with uv
 uv run python bot_server.py
 
-# In yet another terminal, run an example agent
+# In another terminal, run an example agent
 uv run python example_control_loop.py wander
 ```
 
 Server: `localhost:30000/udp`
+
+`make up` starts the FastAPI bot server in Docker. Use the optional step above if you
+prefer running the bot server on your host.
 
 ## Architecture
 
@@ -60,6 +63,7 @@ Server: `localhost:30000/udp`
 The Agent API provides:
 
 ### Observation
+
 - Position & orientation
 - Surrounding blocks (configurable radius)
 - Nearby entities
@@ -67,6 +71,7 @@ The Agent API provides:
 - Health & state
 
 ### Actions
+
 - Movement (forward, backward, left, right, up, down)
 - Rotation (relative or absolute)
 - Dig/mine blocks
@@ -74,6 +79,7 @@ The Agent API provides:
 - Use/interact
 
 ### Communication
+
 - HTTP-based polling from Lua to Python
 - Command queue for action sequencing
 - Type-safe Python data structures
@@ -87,15 +93,17 @@ See [API.md](API.md) for complete documentation.
 Agents are attached to existing player characters. You have two options:
 
 **Option 1: Manual creation in-game**
+
 1. Join the Luanti server as a player
 2. Run `/agent_create` to enable agent control for your character
 3. The Python client can now control your player
 
 **Option 2: Auto-creation on join**
-Set `agent_api.auto_create = true` in `config/minetest.conf.template` to automatically
+Set `agent_api.auto_create = true` in `config/minetest.conf` to automatically
 create an agent when a player named `agent_api.agent_name` joins.
 
 **Chat Commands:**
+
 ```
 /agent_create           - Enable agent control for yourself
 /agent_attach <player>  - Attach agent to another player (requires server privilege)
@@ -106,12 +114,14 @@ create an agent when a player named `agent_api.agent_name` joins.
 ### Current Implementation Status
 
 ✅ **Implemented:**
+
 - Complete action API (movement, rotation, dig, place, use)
 - Observation collection in Lua (position, orientation, blocks, entities, vision)
 - HTTP-based command polling from Lua to Python
 - Example control behaviors
 
 ⚠️ **Planned for future enhancement:**
+
 - Observation pushing from Lua to Python (currently observations are collected but not sent)
 - WebSocket communication for real-time bidirectional data
 - Advanced interaction logic (right-click, punch, item use)
@@ -137,10 +147,10 @@ uv run python example_control_loop.py build
 
 ### Configuration
 
-Add to `config/minetest.conf.template`:
+Add to `config/minetest.conf`:
 
 ```ini
-agent_api.bot_server_url = http://host.docker.internal:8000
+agent_api.bot_server_url = http://bot:8000
 agent_api.poll_interval = 0.2
 agent_api.agent_name = AIAgent
 agent_api.auto_create = false
@@ -171,34 +181,35 @@ client.send_action(MoveAction("forward", speed=1.0))
 ## Data and init
 
 - Data dir: `./data` (minetest data lives under `./data/.minetest`)
-- Templates: `config/minetest.conf.template`, `config/world.mt.template`
+- Config: `config/minetest.conf`, `config/world.mt`
 - Init: `scripts/init-world.sh` runs at container start via `/custom-cont-init.d`
+- World init: copies `config/world.mt` into `./data/.minetest/worlds/world/world.mt` on first run only
+- Bot server URL: edit `config/minetest.conf`
+  - If you run the bot server on your host, set `agent_api.bot_server_url = http://host.docker.internal:8000`
 
 ## Common tasks
 
 ### Change seed
 
-- Option A: set `FIXED_SEED` in `docker-compose.yml`
-- Option B: edit `config/minetest.conf.template`, remove `./data/.minetest/minetest.conf` and `./data/.minetest/worlds/<world>/world.mt`, then restart
+- Edit `config/minetest.conf`, then `make restart`
 
 ### Add mods
 
 - Place mods in `./data/.minetest/mods`
-- Enable in `config/world.mt.template` (new worlds) or `./data/.minetest/worlds/<world>/world.mt` (existing)
-- Restart: `docker compose up -d`
+- Enable in `config/world.mt` (new worlds) or `./data/.minetest/worlds/world/world.mt` (existing)
+- Apply to existing world: `make reset-config` then `make restart`
 
 ### Change game
 
-- Set `GAME_ID` (optional: `GAME_REPO_URL`, `GAME_REPO_BRANCH`)
+- Edit `gameid` in `config/world.mt`
 - Remove `./data/.minetest/games/<gameid>` to re-download
-- Restart: `docker compose up -d`
+- Apply to existing world: `make reset-config` (or `make reset-world` for a clean world)
+- Restart: `make restart`
 
 ### Reset world
 
 ```bash
-docker compose down
-rm -rf ./data/.minetest/worlds/world
-docker compose up -d
+make reset-world
 ```
 
 ## Permissions

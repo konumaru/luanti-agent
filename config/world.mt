@@ -1,4 +1,4 @@
-# World Configuration Template
+# World Configuration
 # This file defines the world settings and enabled mods
 
 enable_damage = true
@@ -13,6 +13,7 @@ world_name = world
 # Enabled Mods
 # agent_api is required for AI agent control via HTTP
 load_mod_agent_api = true
+
 
 # Add more mods here as needed
 # load_mod_mobname = true
