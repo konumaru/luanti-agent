@@ -6,15 +6,26 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Etc/UTC
-      - WORLD_NAME=world
-      - GAME_ID=voxelibre
-      - FIXED_SEED=12345678
-      - "CLI_ARGS=--gameid voxelibre --worldname world"
+      - MINETEST_USER_PATH=/config/.minetest
+      - CONF_FILE=/config/.minetest/main-config/minetest.conf
+      - "CLI_ARGS=--world /config/.minetest/worlds/world"
     ports:
       - 30000:30000/udp
     volumes:
       - ./data:/config
-      - ./config:/config-templates:ro
+      - ./config/minetest.conf:/config/.minetest/main-config/minetest.conf
+      - ./config/minetest.conf:/config/.minetest/minetest.conf
+      - ./config/world.mt:/config-static/world.mt:ro
       - ./scripts:/scripts:ro
       - ./scripts/lsio-init-world.sh:/custom-cont-init.d/10-init-world.sh:ro
+      - ./mods:/config/.minetest/mods
+    restart: unless-stopped
+
+  bot:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    container_name: luanti-bot
+    ports:
+      - 8000:8000
     restart: unless-stopped
