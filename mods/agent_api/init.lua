@@ -69,9 +69,13 @@ local NEED_MAX = 100
 local FOLLOW_RADIUS = 8
 local AVOID_RADIUS = 3
 local FULL_ROTATION = 2 * math.pi
+local RANDOM_STEPS = 3600
+local YAW_OFFSET = math.pi / 2
+local DEBUG_SPAWN_RADIUS = 2
 
 agent_api.living_agents = {}
-local living_rng = PcgRandom(0xBEEFFEED) -- deterministic seed for reproducible demos
+local living_seed = tonumber(minetest.settings:get("agent_api.living_seed")) or 0xBEEFFEED
+local living_rng = PcgRandom(living_seed) -- deterministic seed for reproducible demos
 local living_agent_counter = 0
 
 local function clamp(value, min_v, max_v)
@@ -145,7 +149,10 @@ end
 
 local function act(agent, behavior, perception)
     local obj = agent.object
-    if not obj or obj:is_player() then
+    if not obj then
+        return
+    end
+    if obj:is_player() then
         return
     end
 
@@ -158,7 +165,7 @@ local function act(agent, behavior, perception)
     if behavior == BEHAVIOR.WANDER then
         if agent.wander_timer <= 0 then
             agent.wander_timer = 2.5
-            agent.wander_yaw = (living_rng:next(0, 3600) / 3600.0) * FULL_ROTATION
+            agent.wander_yaw = (living_rng:next(0, RANDOM_STEPS) / RANDOM_STEPS) * FULL_ROTATION
         else
             agent.wander_timer = agent.wander_timer - agent.step_interval
         end
@@ -168,13 +175,13 @@ local function act(agent, behavior, perception)
     elseif behavior == BEHAVIOR.FOLLOW and perception.focus then
         local target_pos = perception.focus:get_pos()
         local dir = vector.direction(pos, target_pos)
-        local yaw = math.atan2(dir.z, dir.x) + math.pi / 2
+        local yaw = math.atan2(dir.z, dir.x) + YAW_OFFSET
         obj:set_yaw(yaw)
         obj:set_velocity(vector.multiply(yaw_to_dir(yaw), 2.0))
     elseif behavior == BEHAVIOR.AVOID and perception.threat then
         local target_pos = perception.threat:get_pos()
         local dir = vector.direction(target_pos, pos)
-        local yaw = math.atan2(dir.z, dir.x) + math.pi / 2
+        local yaw = math.atan2(dir.z, dir.x) + YAW_OFFSET
         obj:set_yaw(yaw)
         obj:set_velocity(vector.multiply(yaw_to_dir(yaw), 2.5))
     end
@@ -267,9 +274,9 @@ function agent_api.spawn_living_agents(center_pos, count)
     count = count or 1
     for i = 1, count do
         local offset = {
-            x = living_rng:next(-2, 2),
+            x = living_rng:next(-DEBUG_SPAWN_RADIUS, DEBUG_SPAWN_RADIUS),
             y = 0.5,
-            z = living_rng:next(-2, 2),
+            z = living_rng:next(-DEBUG_SPAWN_RADIUS, DEBUG_SPAWN_RADIUS),
         }
         local spawn_pos = vector.add(center_pos, offset)
         minetest.add_entity(spawn_pos, "agent_api:living_agent")

@@ -44,6 +44,7 @@ agent_api.agent_name = AIAgent
 agent_api.debug = false
 agent_api.debug_spawn = false        # If true, spawn demo living agents near joining player
 agent_api.debug_spawn_count = 3      # Number of living agents to spawn in debug mode
+agent_api.living_seed = 0xBEEFFEED   # Optional seed override for deterministic living agent movement
 
 # Security settings (required for HTTP)
 secure.http_mods = agent_api
