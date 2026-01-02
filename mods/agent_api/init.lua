@@ -93,18 +93,28 @@ local function yaw_to_dir(yaw)
     return {x = dir.x, y = 0, z = dir.z}
 end
 
-local function find_nearest_player(pos, radius)
-    local nearest = nil
-    local nearest_dist = nil
+local function find_nearest_players(pos)
+    local nearest_focus = nil
+    local nearest_focus_dist = nil
+    local nearest_threat = nil
+    local nearest_threat_dist = nil
+
     for _, player in ipairs(minetest.get_connected_players()) do
         local player_pos = player:get_pos()
-        local dist = vector.distance(pos, player_pos)
-        if dist <= radius and (not nearest_dist or dist < nearest_dist) then
-            nearest = player
-            nearest_dist = dist
+        if player_pos then
+            local dist = vector.distance(pos, player_pos)
+            if dist <= FOLLOW_RADIUS and (not nearest_focus_dist or dist < nearest_focus_dist) then
+                nearest_focus = player
+                nearest_focus_dist = dist
+            end
+            if dist <= AVOID_RADIUS and (not nearest_threat_dist or dist < nearest_threat_dist) then
+                nearest_threat = player
+                nearest_threat_dist = dist
+            end
         end
     end
-    return nearest, nearest_dist
+
+    return nearest_focus, nearest_focus_dist, nearest_threat, nearest_threat_dist
 end
 
 local function default_decision(agent, perception)
@@ -262,8 +272,7 @@ minetest.register_entity("agent_api:living_agent", {
         if not pos then
             return
         end
-        perception.threat, perception.threat_distance = find_nearest_player(pos, AVOID_RADIUS)
-        perception.focus, perception.focus_distance = find_nearest_player(pos, FOLLOW_RADIUS)
+        perception.focus, perception.focus_distance, perception.threat, perception.threat_distance = find_nearest_players(pos)
         if perception.threat and perception.focus and perception.threat == perception.focus then
             perception.focus = nil
         end
@@ -876,12 +885,11 @@ minetest.register_chatcommand("switch_agent", {
     description = "Alias for /agent_create",
     params = "",
     func = function(name, param)
-        local agent = agent_api.create_agent(name)
-        if agent then
-            return true, "Agent attached to player: " .. agent.name
-        else
-            return false, "Failed to create agent"
+        local create_cmd = minetest.registered_chatcommands["agent_create"]
+        if create_cmd and create_cmd.func then
+            return create_cmd.func(name, param)
         end
+        return false, "Agent creation command unavailable"
     end,
 })
 
