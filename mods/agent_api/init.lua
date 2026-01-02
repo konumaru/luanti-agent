@@ -68,9 +68,11 @@ local REST_RECOVERY = 0.8
 local NEED_MAX = 100
 local FOLLOW_RADIUS = 8
 local AVOID_RADIUS = 3
+local FULL_ROTATION = 2 * math.pi
 
 agent_api.living_agents = {}
-local living_rng = PcgRandom(0xBEEFFEED)
+local living_rng = PcgRandom(0xBEEFFEED) -- deterministic seed for reproducible demos
+local living_agent_counter = 0
 
 local function clamp(value, min_v, max_v)
     if value < min_v then
@@ -156,7 +158,7 @@ local function act(agent, behavior, perception)
     if behavior == BEHAVIOR.WANDER then
         if agent.wander_timer <= 0 then
             agent.wander_timer = 2.5
-            agent.wander_yaw = living_rng:next(0, 6283) / 1000.0
+            agent.wander_yaw = (living_rng:next(0, 3600) / 3600.0) * FULL_ROTATION
         else
             agent.wander_timer = agent.wander_timer - agent.step_interval
         end
@@ -203,7 +205,15 @@ minetest.register_entity("agent_api:living_agent", {
         self.step_accum = 0
         self.wander_yaw = 0
         self.object:set_acceleration({x = 0, y = -9.8, z = 0})
-        self.agent_id = "living_" .. tostring(minetest.get_us_time())
+        if staticdata and staticdata ~= "" then
+            local data = minetest.deserialize(staticdata) or {}
+            self.state = data.state or self.state
+            self.behavior = data.behavior or self.behavior
+            self.wander_timer = data.wander_timer or self.wander_timer
+            self.wander_yaw = data.wander_yaw or self.wander_yaw
+        end
+        living_agent_counter = living_agent_counter + 1
+        self.agent_id = "living_" .. tostring(living_agent_counter)
         agent_api.living_agents[self.agent_id] = self
         log("info", "Living agent spawned: " .. self.agent_id)
     end,
@@ -231,8 +241,11 @@ minetest.register_entity("agent_api:living_agent", {
 
         local perception = {}
         local pos = self.object:get_pos()
-        perception.focus, perception.focus_distance = find_nearest_player(pos, FOLLOW_RADIUS)
         perception.threat, perception.threat_distance = find_nearest_player(pos, AVOID_RADIUS)
+        perception.focus, perception.focus_distance = find_nearest_player(pos, FOLLOW_RADIUS)
+        if perception.threat and perception.focus and perception.threat == perception.focus then
+            perception.focus = nil
+        end
         perception.pos = pos
 
         local next_behavior = agent_api.living_decision(self, perception)
