@@ -216,12 +216,12 @@ minetest.register_entity("agent_api:living_agent", {
         visual = "cube",
         visual_size = {x = 0.8, y = 1.2},
         textures = {
-            "default_wood.png",
-            "default_wood.png",
-            "default_wood.png^[brighten",
-            "default_wood.png^[brighten",
-            "default_wood.png",
-            "default_wood.png",
+            "default_mese_block.png",        -- top
+            "default_mese_block.png",        -- bottom
+            "wool_blue.png^[brighten",       -- right
+            "wool_blue.png",                 -- left
+            "default_mese_block.png^[brighten", -- back
+            "default_mese_block.png^[brighten", -- front
         },
     },
 
@@ -881,8 +881,8 @@ minetest.register_chatcommand("agent_create", {
     end,
 })
 
-minetest.register_chatcommand("switch_agent", {
-    description = "Alias for /agent_create",
+minetest.register_chatcommand("agent_switch", {
+    description = "Create an AI agent from the calling player",
     params = "",
     func = function(name, param)
         local create_cmd = minetest.registered_chatcommands["agent_create"]
