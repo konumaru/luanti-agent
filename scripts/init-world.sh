@@ -16,6 +16,7 @@ WORLD_MT_FILE="$WORLD_DIR/world.mt"
 CONFIG_WORLD_MT="$CONFIG_DIR/world.mt"
 CONF_FILE="${CONF_FILE:-$DATA_DIR/minetest.conf}"
 GAMES_DIR="$DATA_DIR/games"
+MODS_DIR="$DATA_DIR/mods"
 
 read_world_setting() {
     local key="$1"
@@ -96,6 +97,85 @@ download_game_archive() {
     extracted_dir="$(dirname "$game_conf")"
     mv "$extracted_dir" "$dest_dir"
     rm -rf "$tmp_dir"
+}
+
+download_mod_archive() {
+    local repo_url="$1"
+    local dest_dir="$2"
+    shift 2
+    local branches=("$@")
+    local repo_base="${repo_url%.git}"
+    local tmp_dir
+    local branch
+
+    if [ "${#branches[@]}" -eq 0 ]; then
+        branches=("master" "main")
+    fi
+
+    tmp_dir="$(mktemp -d)"
+    for branch in "${branches[@]}"; do
+        if download_file "${repo_base}/archive/${branch}.tar.gz" "$tmp_dir/mod.tar.gz"; then
+            if ! command -v tar >/dev/null 2>&1; then
+                echo "Error: tar is required to extract ${branch}.tar.gz"
+                rm -rf "$tmp_dir"
+                return 1
+            fi
+            tar -xzf "$tmp_dir/mod.tar.gz" -C "$tmp_dir"
+            break
+        fi
+        if download_file "${repo_base}/archive/${branch}.zip" "$tmp_dir/mod.zip"; then
+            if ! command -v unzip >/dev/null 2>&1; then
+                echo "Error: unzip is required to extract ${branch}.zip"
+                rm -rf "$tmp_dir"
+                return 1
+            fi
+            unzip -q "$tmp_dir/mod.zip" -d "$tmp_dir"
+            break
+        fi
+    done
+
+    local mod_conf
+    mod_conf="$(find "$tmp_dir" -maxdepth 4 -type f -name "mod.conf" | head -n 1 || true)"
+    if [ -z "$mod_conf" ]; then
+        echo "Error: Could not find mod.conf in downloaded archive"
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+
+    local extracted_dir
+    extracted_dir="$(dirname "$mod_conf")"
+    mv "$extracted_dir" "$dest_dir"
+    rm -rf "$tmp_dir"
+}
+
+ensure_mod() {
+    local mod_name="$1"
+    local repo_url="$2"
+    shift 2
+    local branches=("$@")
+    local dest="$MODS_DIR/$mod_name"
+
+    if [ -f "$dest/mod.conf" ] || [ -f "$dest/init.lua" ]; then
+        echo "Mod '$mod_name' already exists; leaving as-is"
+        return 0
+    fi
+
+    mkdir -p "$MODS_DIR"
+    echo "Mod '$mod_name' not found; downloading from $repo_url..."
+    rm -rf "$dest"
+
+    if command -v git >/dev/null 2>&1; then
+        if [ "${#branches[@]}" -gt 0 ]; then
+            git clone --depth 1 --branch "${branches[0]}" "$repo_url" "$dest" || true
+        fi
+        if [ ! -d "$dest" ]; then
+            git clone --depth 1 "$repo_url" "$dest"
+        fi
+        rm -rf "$dest/.git"
+        return 0
+    fi
+
+    download_mod_archive "$repo_url" "$dest" "${branches[@]}"
 }
 
 echo "=== Luanti World Initialization ==="
@@ -195,5 +275,8 @@ PATCH
         fi
     fi
 fi
+
+# 3rd-party mods (download-once)
+ensure_mod "skinsdb" "https://github.com/minetest-mods/skinsdb.git" "master" "main"
 
 echo "=== World initialization complete ==="

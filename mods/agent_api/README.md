@@ -8,7 +8,7 @@ Luanti-native API for AI agent control and observation.
 - Create/remove agent entities
 - Track multiple agents simultaneously
 - Agent lifecycle management
-- Living agents (cylinder NPC) with hunger/fatigue state and simple rule-based behavior
+- Living agents (demo NPC) with hunger/fatigue state and simple rule-based behavior
 - Debug spawn utility for multiple demo agents
 
 ### Observation API
@@ -45,6 +45,10 @@ agent_api.debug = false
 agent_api.debug_spawn = false        # If true, spawn demo living agents near joining player
 agent_api.debug_spawn_count = 3      # Number of living agents to spawn in debug mode
 agent_api.living_seed = 0xBEEFFEED   # Optional seed override for deterministic living agent movement
+agent_api.living_visual = auto       # auto (default), character, or cube
+agent_api.living_use_skinsdb = true  # If skinsdb/skins is available, pick random textures
+agent_api.living_mesh = character.b3d
+agent_api.living_default_texture = character.png
 
 # Security settings (required for HTTP)
 secure.http_mods = agent_api
@@ -112,6 +116,14 @@ agent_api.execute_action(agent, {
     message = "Hello from Lua!"
 })
 ```
+
+## Character skins (skinsdb)
+
+With `skinsdb` enabled, the demo living agents
+will automatically switch from a cube to the standard `character.b3d` mesh and pick a random skin texture.
+
+If you prefer to force a mode regardless of installed mods, set `agent_api.living_visual = character` or
+`agent_api.living_visual = cube` in `minetest.conf`.
 
 ## Python Integration
 

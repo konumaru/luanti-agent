@@ -14,6 +14,9 @@ world_name = world
 # agent_api is required for AI agent control via HTTP
 load_mod_agent_api = true
 
+# Character skins (auto-downloaded on first start)
+load_mod_skinsdb = true
+
 
 # Add more mods here as needed
 # load_mod_mobname = true

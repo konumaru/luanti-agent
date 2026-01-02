@@ -21,6 +21,12 @@ agent_api.config = {
     -- Debug living agent spawn
     debug_spawn = minetest.settings:get_bool("agent_api.debug_spawn", false),
     debug_spawn_count = tonumber(minetest.settings:get("agent_api.debug_spawn_count")) or 3,
+    -- Living agent visuals (optional integration with skinsdb / player_api)
+    -- living_visual: "auto" (default), "character", or "cube"
+    living_visual = minetest.settings:get("agent_api.living_visual") or "auto",
+    living_mesh = minetest.settings:get("agent_api.living_mesh") or "character.b3d",
+    living_default_texture = minetest.settings:get("agent_api.living_default_texture") or "character.png",
+    living_use_skinsdb = minetest.settings:get_bool("agent_api.living_use_skinsdb", true),
 }
 
 -- Active agents registry
@@ -51,7 +57,7 @@ end
 agent_api.config.auto_create = minetest.settings:get_bool("agent_api.auto_create", false)
 
 -- ============================================================================
--- Living Agent (autonomous cylinder NPC)
+-- Living Agent (autonomous demo NPC)
 -- ============================================================================
 
 local BEHAVIOR = {
@@ -78,6 +84,148 @@ agent_api.living_agents = {}
 local living_seed = tonumber(minetest.settings:get("agent_api.living_seed")) or DEFAULT_LIVING_SEED
 local living_rng = PcgRandom(living_seed) -- deterministic seed for reproducible demos
 local living_agent_counter = 0
+local living_skin_textures_cache = nil
+
+local LIVING_COLLISIONBOX = {-0.3, -0.85, -0.3, 0.3, 0.85, 0.3}
+local LIVING_SPAWN_Y_OFFSET = 0.85
+local LIVING_VISUAL_SIZE = {x = 1.0, y = 1.0}
+
+local function should_use_character_visual()
+    local setting = (agent_api.config.living_visual or "auto"):lower()
+    if setting == "cube" then
+        return false
+    end
+    if setting == "character" then
+        return true
+    end
+    if setting ~= "auto" then
+        log("warning", "Invalid agent_api.living_visual=" .. setting .. " (expected auto/character/cube); using auto")
+    end
+    return minetest.get_modpath("player_api") ~= nil
+        or minetest.get_modpath("skinsdb") ~= nil
+        or minetest.get_modpath("skins") ~= nil
+end
+
+local function textureish(value)
+    if type(value) ~= "string" then
+        return nil
+    end
+    if value:find("%.png") then
+        return value
+    end
+    return nil
+end
+
+local function discover_skinsdb_textures()
+    local textures_set = {}
+
+    local function add_texture(value)
+        local texture = textureish(value)
+        if texture then
+            textures_set[texture] = true
+        end
+    end
+
+    local function collect_from(provider)
+        if type(provider) ~= "table" then
+            return
+        end
+
+        if type(provider.get_skinlist) == "function" then
+            local ok, skin_list = pcall(provider.get_skinlist)
+            if ok and type(skin_list) == "table" then
+                for _, skin in pairs(skin_list) do
+                    if type(skin) == "table" then
+                        add_texture(skin.texture)
+                        if type(skin.textures) == "table" then
+                            add_texture(skin.textures[1])
+                        end
+                    else
+                        add_texture(skin)
+                    end
+                end
+            end
+        end
+
+        if type(provider.skins) == "table" then
+            for _, skin in pairs(provider.skins) do
+                if type(skin) == "table" then
+                    add_texture(skin.texture)
+                    if type(skin.textures) == "table" then
+                        add_texture(skin.textures[1])
+                    end
+                else
+                    add_texture(skin)
+                end
+            end
+        end
+    end
+
+    collect_from(rawget(_G, "skins"))
+    local skinsdb_global = rawget(_G, "skinsdb")
+    if type(skinsdb_global) == "table" then
+        collect_from(skinsdb_global.skins or skinsdb_global)
+    end
+
+    local textures = {}
+    for texture in pairs(textures_set) do
+        table.insert(textures, texture)
+    end
+    table.sort(textures)
+    return textures
+end
+
+local function get_living_skin_textures()
+    if living_skin_textures_cache ~= nil then
+        return living_skin_textures_cache
+    end
+    if not agent_api.config.living_use_skinsdb then
+        living_skin_textures_cache = {}
+        return living_skin_textures_cache
+    end
+    living_skin_textures_cache = discover_skinsdb_textures()
+    return living_skin_textures_cache
+end
+
+local function pick_living_agent_texture()
+    local textures = get_living_skin_textures()
+    if type(textures) == "table" and #textures > 0 then
+        local index = living_rng:next(1, #textures)
+        return textures[index]
+    end
+    return agent_api.config.living_default_texture
+end
+
+local function get_living_agent_initial_properties()
+    if should_use_character_visual() then
+        return {
+            physical = true,
+            collide_with_objects = true,
+            collisionbox = LIVING_COLLISIONBOX,
+            visual = "mesh",
+            mesh = agent_api.config.living_mesh,
+            visual_size = LIVING_VISUAL_SIZE,
+            textures = {agent_api.config.living_default_texture},
+        }
+    end
+
+    return {
+        physical = true,
+        collide_with_objects = true,
+        collisionbox = LIVING_COLLISIONBOX,
+        visual = "cube",
+        visual_size = {x = 0.8, y = 1.2},
+        textures = {
+            -- Use engine-provided fallback texture so this mod doesn't depend on a specific game (e.g. Minetest Game).
+            "unknown_node.png",
+            "unknown_node.png",
+            "unknown_node.png",
+            "unknown_node.png",
+            "unknown_node.png",
+            "unknown_node.png",
+        },
+    }
+end
 
 local function clamp(value, min_v, max_v)
     if value < min_v then
@@ -209,21 +357,7 @@ local function act(agent, behavior, perception)
 end
 
 minetest.register_entity("agent_api:living_agent", {
-    initial_properties = {
-        physical = true,
-        collide_with_objects = true,
-        collisionbox = {-0.3, -0.5, -0.3, 0.3, 0.7, 0.3},
-        visual = "cube",
-        visual_size = {x = 0.8, y = 1.2},
-        textures = {
-            "default_mese_block.png",        -- top
-            "default_mese_block.png",        -- bottom
-            "wool_blue.png^[brighten",       -- right
-            "wool_blue.png",                 -- left
-            "default_mese_block.png^[brighten", -- back
-            "default_mese_block.png^[brighten", -- front
-        },
-    },
+    initial_properties = get_living_agent_initial_properties(),
 
     on_activate = function(self, staticdata, dtime_s)
         self.state = {hunger = 0, fatigue = 0, inventory = {}}
@@ -232,6 +366,7 @@ minetest.register_entity("agent_api:living_agent", {
         self.step_interval = 0.5
         self.step_accum = 0
         self.wander_yaw = 0
+        self.texture = nil
         self.object:set_acceleration({x = 0, y = -9.8, z = 0})
         if staticdata and staticdata ~= "" then
             local data = minetest.deserialize(staticdata) or {}
@@ -239,7 +374,20 @@ minetest.register_entity("agent_api:living_agent", {
             self.behavior = data.behavior or self.behavior
             self.wander_timer = data.wander_timer or self.wander_timer
             self.wander_yaw = data.wander_yaw or self.wander_yaw
+            self.texture = data.texture or self.texture
         end
+
+        if should_use_character_visual() then
+            self.texture = self.texture or pick_living_agent_texture()
+            self.object:set_properties({
+                visual = "mesh",
+                mesh = agent_api.config.living_mesh,
+                textures = {self.texture},
+                visual_size = LIVING_VISUAL_SIZE,
+                collisionbox = LIVING_COLLISIONBOX,
+            })
+        end
+
         living_agent_counter = living_agent_counter + 1
         self.agent_id = "living_" .. tostring(living_agent_counter)
         agent_api.living_agents[self.agent_id] = self
@@ -252,6 +400,7 @@ minetest.register_entity("agent_api:living_agent", {
             behavior = self.behavior,
             wander_timer = self.wander_timer,
             wander_yaw = self.wander_yaw,
+            texture = self.texture,
         })
     end,
 
@@ -298,7 +447,7 @@ function agent_api.spawn_living_agents(center_pos, count)
     for i = 1, count do
         local offset = {
             x = living_rng:next(-DEBUG_SPAWN_RADIUS, DEBUG_SPAWN_RADIUS),
-            y = 0.5,
+            y = LIVING_SPAWN_Y_OFFSET,
             z = living_rng:next(-DEBUG_SPAWN_RADIUS, DEBUG_SPAWN_RADIUS),
         }
         local spawn_pos = vector.add(center_pos, offset)
