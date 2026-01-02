@@ -18,21 +18,13 @@ agent_api.config = {
     agent_name = minetest.settings:get("agent_api.agent_name") or "AIAgent",
     -- Debug logging
     debug = minetest.settings:get_bool("agent_api.debug", false),
+    -- Debug living agent spawn
+    debug_spawn = minetest.settings:get_bool("agent_api.debug_spawn", false),
+    debug_spawn_count = tonumber(minetest.settings:get("agent_api.debug_spawn_count")) or 3,
 }
 
 -- Active agents registry
 agent_api.agents = {}
-
-agent_api.http_api = minetest.request_http_api()
-if not agent_api.http_api then
-    log("error", "HTTP API not available. Add 'agent_api' to secure.http_mods in minetest.conf")
-    log("error", "secure.enable_security=" .. tostring(minetest.settings:get_bool("secure.enable_security")) ..
-        " secure.http_mods=" .. tostring(minetest.settings:get("secure.http_mods")) ..
-        " secure.trusted_mods=" .. tostring(minetest.settings:get("secure.trusted_mods")))
-end
-
--- Auto-create agent for configured player on join
-agent_api.config.auto_create = minetest.settings:get_bool("agent_api.auto_create", false)
 
 -- Logging helper
 local function log(level, msg)
@@ -47,6 +39,230 @@ log("info", "secure.enable_security=" .. tostring(minetest.settings:get_bool("se
     " secure.http_mods=" .. tostring(minetest.settings:get("secure.http_mods")) ..
     " secure.trusted_mods=" .. tostring(minetest.settings:get("secure.trusted_mods")))
 
+agent_api.http_api = minetest.request_http_api()
+if not agent_api.http_api then
+    log("error", "HTTP API not available. Add 'agent_api' to secure.http_mods in minetest.conf")
+    log("error", "secure.enable_security=" .. tostring(minetest.settings:get_bool("secure.enable_security")) ..
+        " secure.http_mods=" .. tostring(minetest.settings:get("secure.http_mods")) ..
+        " secure.trusted_mods=" .. tostring(minetest.settings:get("secure.trusted_mods")))
+end
+
+-- Auto-create agent for configured player on join
+agent_api.config.auto_create = minetest.settings:get_bool("agent_api.auto_create", false)
+
+-- ============================================================================
+-- Living Agent (autonomous cylinder NPC)
+-- ============================================================================
+
+local BEHAVIOR = {
+    WANDER = "wander",
+    FOLLOW = "follow",
+    AVOID = "avoid",
+    REST = "rest",
+    IDLE = "idle",
+}
+
+local HUNGER_RATE = 0.35
+local FATIGUE_RATE = 0.25
+local REST_RECOVERY = 0.8
+local NEED_MAX = 100
+local FOLLOW_RADIUS = 8
+local AVOID_RADIUS = 3
+
+agent_api.living_agents = {}
+local living_rng = PcgRandom(0xBEEFFEED)
+
+local function clamp(value, min_v, max_v)
+    if value < min_v then
+        return min_v
+    elseif value > max_v then
+        return max_v
+    end
+    return value
+end
+
+local function yaw_to_dir(yaw)
+    local dir = minetest.yaw_to_dir(yaw)
+    return {x = dir.x, y = 0, z = dir.z}
+end
+
+local function find_nearest_player(pos, radius)
+    local nearest = nil
+    local nearest_dist = nil
+    for _, player in ipairs(minetest.get_connected_players()) do
+        local player_pos = player:get_pos()
+        local dist = vector.distance(pos, player_pos)
+        if dist <= radius and (not nearest_dist or dist < nearest_dist) then
+            nearest = player
+            nearest_dist = dist
+        end
+    end
+    return nearest, nearest_dist
+end
+
+local function default_decision(agent, perception)
+    if agent.state.fatigue > 85 then
+        return BEHAVIOR.REST
+    end
+
+    if perception.threat and perception.threat_distance and perception.threat_distance < AVOID_RADIUS then
+        return BEHAVIOR.AVOID
+    end
+
+    if perception.focus and perception.focus_distance and perception.focus_distance < FOLLOW_RADIUS then
+        return BEHAVIOR.FOLLOW
+    end
+
+    if agent.state.hunger > 60 and agent.state.fatigue < 60 then
+        return BEHAVIOR.WANDER
+    end
+
+    return BEHAVIOR.IDLE
+end
+
+-- Decision provider can be swapped for future LLM/GOAP implementations
+agent_api.living_decision = default_decision
+
+function agent_api.set_living_decision(decider)
+    if type(decider) == "function" then
+        agent_api.living_decision = decider
+        log("info", "Living agent decision function updated")
+    else
+        log("warning", "Attempted to set invalid living_decision")
+    end
+end
+
+local function update_needs(agent, dtime, behavior)
+    agent.state.hunger = clamp(agent.state.hunger + (HUNGER_RATE * dtime), 0, NEED_MAX)
+    local fatigue_delta = FATIGUE_RATE * dtime
+    if behavior == BEHAVIOR.REST then
+        fatigue_delta = fatigue_delta * -REST_RECOVERY
+    end
+    agent.state.fatigue = clamp(agent.state.fatigue + fatigue_delta, 0, NEED_MAX)
+end
+
+local function act(agent, behavior, perception)
+    local obj = agent.object
+    if not obj or obj:is_player() then
+        return
+    end
+
+    if behavior == BEHAVIOR.REST or behavior == BEHAVIOR.IDLE then
+        obj:set_velocity({x = 0, y = obj:get_velocity().y, z = 0})
+        return
+    end
+
+    local pos = obj:get_pos()
+    if behavior == BEHAVIOR.WANDER then
+        if agent.wander_timer <= 0 then
+            agent.wander_timer = 2.5
+            agent.wander_yaw = living_rng:next(0, 6283) / 1000.0
+        else
+            agent.wander_timer = agent.wander_timer - agent.step_interval
+        end
+        obj:set_yaw(agent.wander_yaw)
+        local dir = yaw_to_dir(agent.wander_yaw)
+        obj:set_velocity(vector.multiply(dir, 1.5))
+    elseif behavior == BEHAVIOR.FOLLOW and perception.focus then
+        local target_pos = perception.focus:get_pos()
+        local dir = vector.direction(pos, target_pos)
+        local yaw = math.atan2(dir.z, dir.x) + math.pi / 2
+        obj:set_yaw(yaw)
+        obj:set_velocity(vector.multiply(yaw_to_dir(yaw), 2.0))
+    elseif behavior == BEHAVIOR.AVOID and perception.threat then
+        local target_pos = perception.threat:get_pos()
+        local dir = vector.direction(target_pos, pos)
+        local yaw = math.atan2(dir.z, dir.x) + math.pi / 2
+        obj:set_yaw(yaw)
+        obj:set_velocity(vector.multiply(yaw_to_dir(yaw), 2.5))
+    end
+end
+
+minetest.register_entity("agent_api:living_agent", {
+    initial_properties = {
+        physical = true,
+        collide_with_objects = true,
+        collisionbox = {-0.3, -0.5, -0.3, 0.3, 0.7, 0.3},
+        visual = "cube",
+        visual_size = {x = 0.8, y = 1.2},
+        textures = {
+            "default_wood.png",
+            "default_wood.png",
+            "default_wood.png^[brighten",
+            "default_wood.png^[brighten",
+            "default_wood.png",
+            "default_wood.png",
+        },
+    },
+
+    on_activate = function(self, staticdata, dtime_s)
+        self.state = {hunger = 0, fatigue = 0, inventory = {}}
+        self.behavior = BEHAVIOR.IDLE
+        self.wander_timer = 0
+        self.step_interval = 0.5
+        self.step_accum = 0
+        self.wander_yaw = 0
+        self.object:set_acceleration({x = 0, y = -9.8, z = 0})
+        self.agent_id = "living_" .. tostring(minetest.get_us_time())
+        agent_api.living_agents[self.agent_id] = self
+        log("info", "Living agent spawned: " .. self.agent_id)
+    end,
+
+    get_staticdata = function(self)
+        return minetest.serialize({
+            state = self.state,
+            behavior = self.behavior,
+            wander_timer = self.wander_timer,
+            wander_yaw = self.wander_yaw,
+        })
+    end,
+
+    on_deactivate = function(self)
+        if self.agent_id then
+            agent_api.living_agents[self.agent_id] = nil
+        end
+    end,
+
+    on_step = function(self, dtime)
+        self.step_accum = self.step_accum + dtime
+        if self.step_accum < self.step_interval then
+            return
+        end
+
+        local perception = {}
+        local pos = self.object:get_pos()
+        perception.focus, perception.focus_distance = find_nearest_player(pos, FOLLOW_RADIUS)
+        perception.threat, perception.threat_distance = find_nearest_player(pos, AVOID_RADIUS)
+        perception.pos = pos
+
+        local next_behavior = agent_api.living_decision(self, perception)
+        if next_behavior ~= self.behavior then
+            self.behavior = next_behavior
+            log("debug", "Living agent " .. self.agent_id .. " behavior -> " .. next_behavior)
+        end
+
+        update_needs(self, self.step_accum, self.behavior)
+        act(self, self.behavior, perception)
+        self.step_accum = 0
+    end,
+})
+
+function agent_api.spawn_living_agents(center_pos, count)
+    if not center_pos then
+        return
+    end
+    count = count or 1
+    for i = 1, count do
+        local offset = {
+            x = living_rng:next(-2, 2),
+            y = 0.5,
+            z = living_rng:next(-2, 2),
+        }
+        local spawn_pos = vector.add(center_pos, offset)
+        minetest.add_entity(spawn_pos, "agent_api:living_agent")
+    end
+end
+
 -- ============================================================================
 -- Player Join Handling
 -- ============================================================================
@@ -59,6 +275,15 @@ minetest.register_on_joinplayer(function(player)
             minetest.after(1.0, function()
                 agent_api.create_agent(name)
                 log("info", "Auto-created agent for: " .. name)
+            end)
+        end
+    end
+    if agent_api.config.debug_spawn then
+        local pos = player:get_pos()
+        if pos then
+            minetest.after(1.0, function()
+                agent_api.spawn_living_agents(pos, agent_api.config.debug_spawn_count)
+                log("info", "Debug spawned living agents near " .. player:get_player_name())
             end)
         end
     end
@@ -613,6 +838,19 @@ minetest.register_chatcommand("agent_create", {
     end,
 })
 
+minetest.register_chatcommand("switch_agent", {
+    description = "Alias for /agent_create",
+    params = "",
+    func = function(name, param)
+        local agent = agent_api.create_agent(name)
+        if agent then
+            return true, "Agent attached to player: " .. agent.name
+        else
+            return false, "Failed to create agent"
+        end
+    end,
+})
+
 minetest.register_chatcommand("agent_attach", {
     description = "Attach agent to another player (requires server privilege)",
     params = "<player_name>",
@@ -642,6 +880,20 @@ minetest.register_chatcommand("agent_remove", {
         else
             return false, "Agent not found: " .. target_name
         end
+    end,
+})
+
+minetest.register_chatcommand("agent_spawn_debug", {
+    description = "Spawn living demo agents near you",
+    params = "[count]",
+    func = function(name, param)
+        local player = minetest.get_player_by_name(name)
+        if not player then
+            return false, "Player not found"
+        end
+        local count = tonumber(param) or agent_api.config.debug_spawn_count or 3
+        agent_api.spawn_living_agents(player:get_pos(), count)
+        return true, "Spawned " .. count .. " living agents nearby"
     end,
 })
 

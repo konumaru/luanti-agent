@@ -15,6 +15,7 @@ Reproducible Luanti server for agent experiments with native Agent Control & Obs
 - **Python client library** for controlling agents
 - **Observe → Act control loop** with minimal interface
 - **Extensible architecture** for AI experiments
+- **Living agents**: simple rule-based NPCs with hunger/fatigue state and debug spawn support
 
 ## Quick start
 
@@ -109,6 +110,8 @@ create an agent when a player named `agent_api.agent_name` joins.
 /agent_attach <player>  - Attach agent to another player (requires server privilege)
 /agent_remove [player]  - Disable agent control (defaults to self)
 /agent_list             - List all active agents
+/agent_spawn_debug [n]  - Spawn demo living agents near you (default count from config)
+/switch_agent           - Alias of /agent_create
 ```
 
 ### Current Implementation Status

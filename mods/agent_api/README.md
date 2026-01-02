@@ -8,6 +8,8 @@ Luanti-native API for AI agent control and observation.
 - Create/remove agent entities
 - Track multiple agents simultaneously
 - Agent lifecycle management
+- Living agents (cylinder NPC) with hunger/fatigue state and simple rule-based behavior
+- Debug spawn utility for multiple demo agents
 
 ### Observation API
 - **Position & Orientation**: Get agent's current position, yaw, pitch, and look direction
@@ -40,6 +42,8 @@ agent_api.bot_server_url = http://bot:8000
 agent_api.poll_interval = 0.2
 agent_api.agent_name = AIAgent
 agent_api.debug = false
+agent_api.debug_spawn = false        # If true, spawn demo living agents near joining player
+agent_api.debug_spawn_count = 3      # Number of living agents to spawn in debug mode
 
 # Security settings (required for HTTP)
 secure.http_mods = agent_api
@@ -56,6 +60,8 @@ If you run the bot server on your host, set `agent_api.bot_server_url = http://h
 /agent_attach <player>  - Attach agent to another player (requires server privilege)
 /agent_remove [player]  - Remove agent control from player (defaults to self)
 /agent_list             - List all active agents
+/agent_spawn_debug [n]  - Spawn n living agents near you (default from config)
+/switch_agent           - Alias of /agent_create
 ```
 
 ### Lua API
