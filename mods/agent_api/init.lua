@@ -62,9 +62,9 @@ local BEHAVIOR = {
     IDLE = "idle",
 }
 
-local HUNGER_RATE = 0.35
-local FATIGUE_RATE = 0.25
-local REST_RECOVERY = 0.8
+local HUNGER_RATE = 0.35 -- per-second hunger increase
+local FATIGUE_RATE = 0.25 -- per-second fatigue increase
+local REST_RECOVERY = 0.8 -- recovery multiplier while resting
 local NEED_MAX = 100
 local FOLLOW_RADIUS = 8
 local AVOID_RADIUS = 3
@@ -72,9 +72,10 @@ local FULL_ROTATION = 2 * math.pi
 local RANDOM_STEPS = 3600
 local YAW_OFFSET = math.pi / 2
 local DEBUG_SPAWN_RADIUS = 2
+local DEFAULT_LIVING_SEED = 0xBEEFFEED
 
 agent_api.living_agents = {}
-local living_seed = tonumber(minetest.settings:get("agent_api.living_seed")) or 0xBEEFFEED
+local living_seed = tonumber(minetest.settings:get("agent_api.living_seed")) or DEFAULT_LIVING_SEED
 local living_rng = PcgRandom(living_seed) -- deterministic seed for reproducible demos
 local living_agent_counter = 0
 
@@ -157,11 +158,15 @@ local function act(agent, behavior, perception)
     end
 
     if behavior == BEHAVIOR.REST or behavior == BEHAVIOR.IDLE then
-        obj:set_velocity({x = 0, y = obj:get_velocity().y, z = 0})
+        local velocity = obj:get_velocity() or {x = 0, y = 0, z = 0}
+        obj:set_velocity({x = 0, y = velocity.y, z = 0})
         return
     end
 
     local pos = obj:get_pos()
+    if not pos then
+        return
+    end
     if behavior == BEHAVIOR.WANDER then
         if agent.wander_timer <= 0 then
             agent.wander_timer = 2.5
@@ -174,12 +179,18 @@ local function act(agent, behavior, perception)
         obj:set_velocity(vector.multiply(dir, 1.5))
     elseif behavior == BEHAVIOR.FOLLOW and perception.focus then
         local target_pos = perception.focus:get_pos()
+        if not target_pos then
+            return
+        end
         local dir = vector.direction(pos, target_pos)
         local yaw = math.atan2(dir.z, dir.x) + YAW_OFFSET
         obj:set_yaw(yaw)
         obj:set_velocity(vector.multiply(yaw_to_dir(yaw), 2.0))
     elseif behavior == BEHAVIOR.AVOID and perception.threat then
         local target_pos = perception.threat:get_pos()
+        if not target_pos then
+            return
+        end
         local dir = vector.direction(target_pos, pos)
         local yaw = math.atan2(dir.z, dir.x) + YAW_OFFSET
         obj:set_yaw(yaw)
@@ -248,6 +259,9 @@ minetest.register_entity("agent_api:living_agent", {
 
         local perception = {}
         local pos = self.object:get_pos()
+        if not pos then
+            return
+        end
         perception.threat, perception.threat_distance = find_nearest_player(pos, AVOID_RADIUS)
         perception.focus, perception.focus_distance = find_nearest_player(pos, FOLLOW_RADIUS)
         if perception.threat and perception.focus and perception.threat == perception.focus then
