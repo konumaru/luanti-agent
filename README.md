@@ -15,6 +15,7 @@ Reproducible Luanti server for agent experiments with native Agent Control & Obs
 - **Python client library** for controlling agents
 - **Observe → Act control loop** with minimal interface
 - **Extensible architecture** for AI experiments
+- **Living agents**: simple rule-based NPCs with hunger/fatigue state, debug spawn support, and optional `skinsdb` character visuals
 
 ## Quick start
 
@@ -109,6 +110,8 @@ create an agent when a player named `agent_api.agent_name` joins.
 /agent_attach <player>  - Attach agent to another player (requires server privilege)
 /agent_remove [player]  - Disable agent control (defaults to self)
 /agent_list             - List all active agents
+/agent_spawn_debug [n]  - Spawn demo living agents near you (default count from config)
+/switch_agent           - Alias of /agent_create
 ```
 
 ### Current Implementation Status
@@ -198,6 +201,13 @@ client.send_action(MoveAction("forward", speed=1.0))
 - Place mods in `./data/.minetest/mods`
 - Enable in `config/world.mt` (new worlds) or `./data/.minetest/worlds/world/world.mt` (existing)
 - Apply to existing world: `make reset-config` then `make restart`
+
+#### Optional: skinsdb (character skins)
+
+- `skinsdb` is auto-downloaded into `./mods/skinsdb` on first container start
+- Enabled by default in `config/world.mt` (`load_mod_skinsdb = true`)
+- The demo living agents render as a character mesh and pick a random skin when available
+- To re-download/upgrade: delete `./mods/skinsdb` then `make restart`
 
 ### Change game
 
