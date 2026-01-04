@@ -8,6 +8,11 @@ local PLAYER_EYE_HEIGHT = 1.5  -- Player eye level offset for raycast
 local BLOCK_PLACE_OFFSET = {x = 0, y = 1, z = 0}  -- Default offset for block placement
 local CLOSE_VISIBILITY_RADIUS = 1.5  -- Distance within which blocks are always considered visible
 
+local DEFAULT_LIVING_MESH = "character.b3d"
+if minetest.get_modpath("skinsdb") ~= nil then
+    DEFAULT_LIVING_MESH = "skinsdb_3d_armor_character_5.b3d"
+end
+
 -- Configuration
 agent_api.config = {
     -- Python bot server URL (can be overridden via minetest.conf)
@@ -24,8 +29,8 @@ agent_api.config = {
     -- Living agent visuals (optional integration with skinsdb / player_api)
     -- living_visual: "auto" (default), "character", or "cube"
     living_visual = minetest.settings:get("agent_api.living_visual") or "auto",
-    living_mesh = minetest.settings:get("agent_api.living_mesh") or "character.b3d",
-    living_default_texture = minetest.settings:get("agent_api.living_default_texture") or "character.png",
+    living_mesh = minetest.settings:get("agent_api.living_mesh") or DEFAULT_LIVING_MESH,
+    living_default_texture = minetest.settings:get("agent_api.living_default_texture") or "unknown_node.png",
     living_use_skinsdb = minetest.settings:get_bool("agent_api.living_use_skinsdb", true),
 }
 
@@ -196,6 +201,56 @@ local function pick_living_agent_texture()
     return agent_api.config.living_default_texture
 end
 
+local function sanitize_textures(textures)
+    if type(textures) == "string" then
+        if textures ~= "" then
+            return {textures}
+        end
+        return nil
+    end
+
+    if type(textures) ~= "table" then
+        return nil
+    end
+
+    local out = {}
+    for _, value in ipairs(textures) do
+        if type(value) == "string" and value ~= "" then
+            table.insert(out, value)
+        end
+    end
+
+    if #out == 0 then
+        return nil
+    end
+    return out
+end
+
+local function get_player_appearance(player)
+    if not player or type(player.get_properties) ~= "function" then
+        return nil
+    end
+
+    local props = player:get_properties() or {}
+    if type(props) ~= "table" then
+        return nil
+    end
+
+    local mesh = type(props.mesh) == "string" and props.mesh ~= "" and props.mesh or nil
+    local textures = sanitize_textures(props.textures)
+    local visual_size = type(props.visual_size) == "table" and props.visual_size or nil
+
+    if not mesh or not textures then
+        return nil
+    end
+
+    return {
+        mesh = mesh,
+        textures = textures,
+        visual_size = visual_size,
+    }
+end
+
 local function get_living_agent_initial_properties()
     if should_use_character_visual() then
         return {
@@ -225,6 +280,33 @@ local function get_living_agent_initial_properties()
             "unknown_node.png",
         },
     }
+end
+
+local function apply_living_agent_appearance(self)
+    local appearance = self.appearance
+    if type(appearance) == "table" and type(appearance.mesh) == "string" and appearance.mesh ~= "" then
+        local textures = sanitize_textures(appearance.textures) or {self.texture or agent_api.config.living_default_texture}
+        self.object:set_properties({
+            visual = "mesh",
+            mesh = appearance.mesh,
+            textures = textures,
+            visual_size = type(appearance.visual_size) == "table" and appearance.visual_size or LIVING_VISUAL_SIZE,
+            collisionbox = LIVING_COLLISIONBOX,
+        })
+        return
+    end
+
+    if should_use_character_visual() then
+        self.texture = self.texture or pick_living_agent_texture()
+        self.object:set_properties({
+            visual = "mesh",
+            mesh = agent_api.config.living_mesh,
+            textures = {self.texture},
+            visual_size = LIVING_VISUAL_SIZE,
+            collisionbox = LIVING_COLLISIONBOX,
+        })
+        return
+    end
 end
 
 local function clamp(value, min_v, max_v)
@@ -367,6 +449,7 @@ minetest.register_entity("agent_api:living_agent", {
         self.step_accum = 0
         self.wander_yaw = 0
         self.texture = nil
+        self.appearance = nil
         self.object:set_acceleration({x = 0, y = -9.8, z = 0})
         if staticdata and staticdata ~= "" then
             local data = minetest.deserialize(staticdata) or {}
@@ -375,18 +458,10 @@ minetest.register_entity("agent_api:living_agent", {
             self.wander_timer = data.wander_timer or self.wander_timer
             self.wander_yaw = data.wander_yaw or self.wander_yaw
             self.texture = data.texture or self.texture
+            self.appearance = data.appearance or self.appearance
         end
 
-        if should_use_character_visual() then
-            self.texture = self.texture or pick_living_agent_texture()
-            self.object:set_properties({
-                visual = "mesh",
-                mesh = agent_api.config.living_mesh,
-                textures = {self.texture},
-                visual_size = LIVING_VISUAL_SIZE,
-                collisionbox = LIVING_COLLISIONBOX,
-            })
-        end
+        apply_living_agent_appearance(self)
 
         living_agent_counter = living_agent_counter + 1
         self.agent_id = "living_" .. tostring(living_agent_counter)
@@ -401,6 +476,7 @@ minetest.register_entity("agent_api:living_agent", {
             wander_timer = self.wander_timer,
             wander_yaw = self.wander_yaw,
             texture = self.texture,
+            appearance = self.appearance,
         })
     end,
 
@@ -439,11 +515,25 @@ minetest.register_entity("agent_api:living_agent", {
     end,
 })
 
-function agent_api.spawn_living_agents(center_pos, count)
+function agent_api.spawn_living_agents(center_pos, count, opts)
     if not center_pos then
         return
     end
     count = count or 1
+
+    local appearance = nil
+    if type(opts) == "table" then
+        appearance = opts.appearance
+        if not appearance and opts.player then
+            appearance = get_player_appearance(opts.player)
+        end
+    end
+
+    local staticdata = ""
+    if appearance then
+        staticdata = minetest.serialize({appearance = appearance})
+    end
+
     for i = 1, count do
         local offset = {
             x = living_rng:next(-DEBUG_SPAWN_RADIUS, DEBUG_SPAWN_RADIUS),
@@ -451,7 +541,7 @@ function agent_api.spawn_living_agents(center_pos, count)
             z = living_rng:next(-DEBUG_SPAWN_RADIUS, DEBUG_SPAWN_RADIUS),
         }
         local spawn_pos = vector.add(center_pos, offset)
-        minetest.add_entity(spawn_pos, "agent_api:living_agent")
+        minetest.add_entity(spawn_pos, "agent_api:living_agent", staticdata)
     end
 end
 
@@ -473,9 +563,11 @@ minetest.register_on_joinplayer(function(player)
     if agent_api.config.debug_spawn then
         local pos = player:get_pos()
         if pos then
+            local player_name = player:get_player_name()
             minetest.after(1.0, function()
-                agent_api.spawn_living_agents(pos, agent_api.config.debug_spawn_count)
-                log("info", "Debug spawned living agents near " .. player:get_player_name())
+                local spawner = minetest.get_player_by_name(player_name)
+                agent_api.spawn_living_agents(pos, agent_api.config.debug_spawn_count, {player = spawner})
+                log("info", "Debug spawned living agents near " .. player_name)
             end)
         end
     end
@@ -1083,7 +1175,7 @@ minetest.register_chatcommand("agent_spawn_debug", {
             return false, "Player not found"
         end
         local count = tonumber(param) or agent_api.config.debug_spawn_count or 3
-        agent_api.spawn_living_agents(player:get_pos(), count)
+        agent_api.spawn_living_agents(player:get_pos(), count, {player = player})
         return true, "Spawned " .. count .. " living agents nearby"
     end,
 })

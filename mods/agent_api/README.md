@@ -47,8 +47,8 @@ agent_api.debug_spawn_count = 3      # Number of living agents to spawn in debug
 agent_api.living_seed = 0xBEEFFEED   # Optional seed override for deterministic living agent movement
 agent_api.living_visual = auto       # auto (default), character, or cube
 agent_api.living_use_skinsdb = true  # If skinsdb/skins is available, pick random textures
-agent_api.living_mesh = character.b3d
-agent_api.living_default_texture = character.png
+agent_api.living_mesh = character.b3d  # default: skinsdb_3d_armor_character_5.b3d when skinsdb is enabled
+agent_api.living_default_texture = unknown_node.png
 
 # Security settings (required for HTTP)
 secure.http_mods = agent_api
@@ -119,8 +119,10 @@ agent_api.execute_action(agent, {
 
 ## Character skins (skinsdb)
 
-With `skinsdb` enabled, the demo living agents
-will automatically switch from a cube to the standard `character.b3d` mesh and pick a random skin texture.
+With `skinsdb` enabled, the demo living agents will use a character mesh and can pick a random skin texture.
+
+When you spawn them via `/agent_spawn_debug`, they will try to inherit your current player `mesh` + `textures`
+so they look like a real character (often exactly your skin), even in games that don't ship `character.b3d`.
 
 If you prefer to force a mode regardless of installed mods, set `agent_api.living_visual = character` or
 `agent_api.living_visual = cube` in `minetest.conf`.

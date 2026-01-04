@@ -186,7 +186,7 @@ client.send_action(MoveAction("forward", speed=1.0))
 - Data dir: `./data` (minetest data lives under `./data/.minetest`)
 - Config: `config/minetest.conf`, `config/world.mt`
 - Init: `scripts/init-world.sh` runs at container start via `/custom-cont-init.d`
-- World init: copies `config/world.mt` into `./data/.minetest/worlds/world/world.mt` on first run only
+- World init: copies `config/world.mt` into `./data/.minetest/worlds/world/world.mt`, and keeps it in sync as long as it hasn't been manually customized
 - Bot server URL: edit `config/minetest.conf`
   - If you run the bot server on your host, set `agent_api.bot_server_url = http://host.docker.internal:8000`
 
