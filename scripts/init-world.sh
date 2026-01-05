@@ -293,6 +293,7 @@ PATCH
 fi
 
 # 3rd-party mods (download-once)
+ensure_mod "player_api" "https://github.com/minetest-mods/player_api.git" "master" "main"
 ensure_mod "skinsdb" "https://github.com/minetest-mods/skinsdb.git" "master" "main"
 
 echo "=== World initialization complete ==="

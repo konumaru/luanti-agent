@@ -15,6 +15,7 @@ world_name = world
 load_mod_agent_api = true
 
 # Character skins (auto-downloaded on first start)
+load_mod_player_api = true
 load_mod_skinsdb = true
 
 

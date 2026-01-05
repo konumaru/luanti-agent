@@ -204,10 +204,10 @@ client.send_action(MoveAction("forward", speed=1.0))
 
 #### Optional: skinsdb (character skins)
 
-- `skinsdb` is auto-downloaded into `./mods/skinsdb` on first container start
-- Enabled by default in `config/world.mt` (`load_mod_skinsdb = true`)
+- `skinsdb` depends on `player_api` (both are included under `./mods/` and also auto-downloaded by `scripts/init-world.sh` if missing)
+- Enabled by default in `config/world.mt` (`load_mod_player_api = true`, `load_mod_skinsdb = true`)
 - The demo living agents render as a character mesh and pick a random skin when available
-- To re-download/upgrade: delete `./mods/skinsdb` then `make restart`
+- To re-download/upgrade: delete `./mods/player_api` and/or `./mods/skinsdb`, then `make restart`
 
 ### Change game
 
