@@ -15,6 +15,7 @@ Reproducible Luanti server for agent experiments with native Agent Control & Obs
 - **Python client library** for controlling agents
 - **Observe → Act control loop** with minimal interface
 - **Extensible architecture** for AI experiments
+- **Living agents**: simple rule-based NPCs with hunger/fatigue state, debug spawn support, and optional `skinsdb` character visuals
 
 ## Quick start
 
@@ -109,6 +110,8 @@ create an agent when a player named `agent_api.agent_name` joins.
 /agent_attach <player>  - Attach agent to another player (requires server privilege)
 /agent_remove [player]  - Disable agent control (defaults to self)
 /agent_list             - List all active agents
+/agent_spawn_debug [n]  - Spawn demo living agents near you (default count from config)
+/switch_agent           - Alias of /agent_create
 ```
 
 ### Current Implementation Status
@@ -183,7 +186,7 @@ client.send_action(MoveAction("forward", speed=1.0))
 - Data dir: `./data` (minetest data lives under `./data/.minetest`)
 - Config: `config/minetest.conf`, `config/world.mt`
 - Init: `scripts/init-world.sh` runs at container start via `/custom-cont-init.d`
-- World init: copies `config/world.mt` into `./data/.minetest/worlds/world/world.mt` on first run only
+- World init: copies `config/world.mt` into `./data/.minetest/worlds/world/world.mt`, and keeps it in sync as long as it hasn't been manually customized
 - Bot server URL: edit `config/minetest.conf`
   - If you run the bot server on your host, set `agent_api.bot_server_url = http://host.docker.internal:8000`
 
@@ -198,6 +201,13 @@ client.send_action(MoveAction("forward", speed=1.0))
 - Place mods in `./data/.minetest/mods`
 - Enable in `config/world.mt` (new worlds) or `./data/.minetest/worlds/world/world.mt` (existing)
 - Apply to existing world: `make reset-config` then `make restart`
+
+#### Optional: skinsdb (character skins)
+
+- `skinsdb` depends on `player_api` (both are included under `./mods/` and also auto-downloaded by `scripts/init-world.sh` if missing)
+- Enabled by default in `config/world.mt` (`load_mod_player_api = true`, `load_mod_skinsdb = true`)
+- The demo living agents render as a character mesh and pick a random skin when available
+- To re-download/upgrade: delete `./mods/player_api` and/or `./mods/skinsdb`, then `make restart`
 
 ### Change game
 

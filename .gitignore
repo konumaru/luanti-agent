@@ -53,3 +53,6 @@ tmp/
 
 # Docker
 .docker/
+
+# Downloaded 3rd-party mods (auto-installed by scripts/init-world.sh)
+mods/skinsdb/

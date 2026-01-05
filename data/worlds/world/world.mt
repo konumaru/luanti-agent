@@ -1,4 +1,4 @@
-# World Configuration
+# World Configuration Template
 # This file defines the world settings and enabled mods
 
 enable_damage = true
@@ -7,17 +7,12 @@ mod_storage_backend = sqlite3
 auth_backend = sqlite3
 player_backend = sqlite3
 backend = sqlite3
-gameid = voxelibre
+gameid = devtest
 world_name = world
 
 # Enabled Mods
-# agent_api is required for AI agent control via HTTP
-load_mod_agent_api = true
-
-# Character skins (auto-downloaded on first start)
-load_mod_player_api = true
-load_mod_skinsdb = true
-
+# python_bot is required for AI agent experiments via HTTP
+load_mod_python_bot = true
 
 # Add more mods here as needed
 # load_mod_mobname = true

@@ -8,6 +8,11 @@ local PLAYER_EYE_HEIGHT = 1.5  -- Player eye level offset for raycast
 local BLOCK_PLACE_OFFSET = {x = 0, y = 1, z = 0}  -- Default offset for block placement
 local CLOSE_VISIBILITY_RADIUS = 1.5  -- Distance within which blocks are always considered visible
 
+local DEFAULT_LIVING_MESH = "character.b3d"
+if minetest.get_modpath("skinsdb") ~= nil then
+    DEFAULT_LIVING_MESH = "skinsdb_3d_armor_character_5.b3d"
+end
+
 -- Configuration
 agent_api.config = {
     -- Python bot server URL (can be overridden via minetest.conf)
@@ -18,21 +23,19 @@ agent_api.config = {
     agent_name = minetest.settings:get("agent_api.agent_name") or "AIAgent",
     -- Debug logging
     debug = minetest.settings:get_bool("agent_api.debug", false),
+    -- Debug living agent spawn
+    debug_spawn = minetest.settings:get_bool("agent_api.debug_spawn", false),
+    debug_spawn_count = tonumber(minetest.settings:get("agent_api.debug_spawn_count")) or 3,
+    -- Living agent visuals (optional integration with skinsdb / player_api)
+    -- living_visual: "auto" (default), "character", or "cube"
+    living_visual = minetest.settings:get("agent_api.living_visual") or "auto",
+    living_mesh = minetest.settings:get("agent_api.living_mesh") or DEFAULT_LIVING_MESH,
+    living_default_texture = minetest.settings:get("agent_api.living_default_texture") or "unknown_node.png",
+    living_use_skinsdb = minetest.settings:get_bool("agent_api.living_use_skinsdb", true),
 }
 
 -- Active agents registry
 agent_api.agents = {}
-
-agent_api.http_api = minetest.request_http_api()
-if not agent_api.http_api then
-    log("error", "HTTP API not available. Add 'agent_api' to secure.http_mods in minetest.conf")
-    log("error", "secure.enable_security=" .. tostring(minetest.settings:get_bool("secure.enable_security")) ..
-        " secure.http_mods=" .. tostring(minetest.settings:get("secure.http_mods")) ..
-        " secure.trusted_mods=" .. tostring(minetest.settings:get("secure.trusted_mods")))
-end
-
--- Auto-create agent for configured player on join
-agent_api.config.auto_create = minetest.settings:get_bool("agent_api.auto_create", false)
 
 -- Logging helper
 local function log(level, msg)
@@ -47,6 +50,501 @@ log("info", "secure.enable_security=" .. tostring(minetest.settings:get_bool("se
     " secure.http_mods=" .. tostring(minetest.settings:get("secure.http_mods")) ..
     " secure.trusted_mods=" .. tostring(minetest.settings:get("secure.trusted_mods")))
 
+agent_api.http_api = minetest.request_http_api()
+if not agent_api.http_api then
+    log("error", "HTTP API not available. Add 'agent_api' to secure.http_mods in minetest.conf")
+    log("error", "secure.enable_security=" .. tostring(minetest.settings:get_bool("secure.enable_security")) ..
+        " secure.http_mods=" .. tostring(minetest.settings:get("secure.http_mods")) ..
+        " secure.trusted_mods=" .. tostring(minetest.settings:get("secure.trusted_mods")))
+end
+
+-- Auto-create agent for configured player on join
+agent_api.config.auto_create = minetest.settings:get_bool("agent_api.auto_create", false)
+
+-- ============================================================================
+-- Living Agent (autonomous demo NPC)
+-- ============================================================================
+
+local BEHAVIOR = {
+    WANDER = "wander",
+    FOLLOW = "follow",
+    AVOID = "avoid",
+    REST = "rest",
+    IDLE = "idle",
+}
+
+local HUNGER_RATE = 0.35 -- per-second hunger increase
+local FATIGUE_RATE = 0.25 -- per-second fatigue increase
+local REST_RECOVERY = 0.8 -- recovery multiplier while resting
+local NEED_MAX = 100
+local FOLLOW_RADIUS = 8
+local AVOID_RADIUS = 3
+local FULL_ROTATION = 2 * math.pi
+local RANDOM_STEPS = 3600
+local YAW_OFFSET = math.pi / 2
+local DEBUG_SPAWN_RADIUS = 2
+local DEFAULT_LIVING_SEED = 0xBEEFFEED
+
+agent_api.living_agents = {}
+local living_seed = tonumber(minetest.settings:get("agent_api.living_seed")) or DEFAULT_LIVING_SEED
+local living_rng = PcgRandom(living_seed) -- deterministic seed for reproducible demos
+local living_agent_counter = 0
+local living_skin_textures_cache = nil
+
+local LIVING_COLLISIONBOX = {-0.3, -0.85, -0.3, 0.3, 0.85, 0.3}
+local LIVING_SPAWN_Y_OFFSET = 0.85
+local LIVING_VISUAL_SIZE = {x = 1.0, y = 1.0}
+
+local function should_use_character_visual()
+    local setting = (agent_api.config.living_visual or "auto"):lower()
+    if setting == "cube" then
+        return false
+    end
+    if setting == "character" then
+        return true
+    end
+    if setting ~= "auto" then
+        log("warning", "Invalid agent_api.living_visual=" .. setting .. " (expected auto/character/cube); using auto")
+    end
+    return minetest.get_modpath("player_api") ~= nil
+        or minetest.get_modpath("skinsdb") ~= nil
+        or minetest.get_modpath("skins") ~= nil
+end
+
+local function textureish(value)
+    if type(value) ~= "string" then
+        return nil
+    end
+    if value:find("%.png") then
+        return value
+    end
+    return nil
+end
+
+local function discover_skinsdb_textures()
+    local textures_set = {}
+
+    local function add_texture(value)
+        local texture = textureish(value)
+        if texture then
+            textures_set[texture] = true
+        end
+    end
+
+    local function collect_from(provider)
+        if type(provider) ~= "table" then
+            return
+        end
+
+        if type(provider.get_skinlist) == "function" then
+            local ok, skin_list = pcall(provider.get_skinlist)
+            if ok and type(skin_list) == "table" then
+                for _, skin in pairs(skin_list) do
+                    if type(skin) == "table" then
+                        add_texture(skin.texture)
+                        if type(skin.textures) == "table" then
+                            add_texture(skin.textures[1])
+                        end
+                    else
+                        add_texture(skin)
+                    end
+                end
+            end
+        end
+
+        if type(provider.skins) == "table" then
+            for _, skin in pairs(provider.skins) do
+                if type(skin) == "table" then
+                    add_texture(skin.texture)
+                    if type(skin.textures) == "table" then
+                        add_texture(skin.textures[1])
+                    end
+                else
+                    add_texture(skin)
+                end
+            end
+        end
+    end
+
+    collect_from(rawget(_G, "skins"))
+    local skinsdb_global = rawget(_G, "skinsdb")
+    if type(skinsdb_global) == "table" then
+        collect_from(skinsdb_global.skins or skinsdb_global)
+    end
+
+    local textures = {}
+    for texture in pairs(textures_set) do
+        table.insert(textures, texture)
+    end
+    table.sort(textures)
+    return textures
+end
+
+local function get_living_skin_textures()
+    if living_skin_textures_cache ~= nil then
+        return living_skin_textures_cache
+    end
+    if not agent_api.config.living_use_skinsdb then
+        living_skin_textures_cache = {}
+        return living_skin_textures_cache
+    end
+    living_skin_textures_cache = discover_skinsdb_textures()
+    return living_skin_textures_cache
+end
+
+local function pick_living_agent_texture()
+    local textures = get_living_skin_textures()
+    if type(textures) == "table" and #textures > 0 then
+        local index = living_rng:next(1, #textures)
+        return textures[index]
+    end
+    return agent_api.config.living_default_texture
+end
+
+local function sanitize_textures(textures)
+    if type(textures) == "string" then
+        if textures ~= "" then
+            return {textures}
+        end
+        return nil
+    end
+
+    if type(textures) ~= "table" then
+        return nil
+    end
+
+    local out = {}
+    for _, value in ipairs(textures) do
+        if type(value) == "string" and value ~= "" then
+            table.insert(out, value)
+        end
+    end
+
+    if #out == 0 then
+        return nil
+    end
+    return out
+end
+
+local function get_player_appearance(player)
+    if not player or type(player.get_properties) ~= "function" then
+        return nil
+    end
+
+    local props = player:get_properties() or {}
+    if type(props) ~= "table" then
+        return nil
+    end
+
+    local mesh = type(props.mesh) == "string" and props.mesh ~= "" and props.mesh or nil
+    local textures = sanitize_textures(props.textures)
+    local visual_size = type(props.visual_size) == "table" and props.visual_size or nil
+
+    if not mesh or not textures then
+        return nil
+    end
+
+    return {
+        mesh = mesh,
+        textures = textures,
+        visual_size = visual_size,
+    }
+end
+
+local function get_living_agent_initial_properties()
+    if should_use_character_visual() then
+        return {
+            physical = true,
+            collide_with_objects = true,
+            collisionbox = LIVING_COLLISIONBOX,
+            visual = "mesh",
+            mesh = agent_api.config.living_mesh,
+            visual_size = LIVING_VISUAL_SIZE,
+            textures = {agent_api.config.living_default_texture},
+        }
+    end
+
+    return {
+        physical = true,
+        collide_with_objects = true,
+        collisionbox = LIVING_COLLISIONBOX,
+        visual = "cube",
+        visual_size = {x = 0.8, y = 1.2},
+        textures = {
+            -- Use engine-provided fallback texture so this mod doesn't depend on a specific game (e.g. Minetest Game).
+            "unknown_node.png",
+            "unknown_node.png",
+            "unknown_node.png",
+            "unknown_node.png",
+            "unknown_node.png",
+            "unknown_node.png",
+        },
+    }
+end
+
+local function apply_living_agent_appearance(self)
+    local appearance = self.appearance
+    if type(appearance) == "table" and type(appearance.mesh) == "string" and appearance.mesh ~= "" then
+        local textures = sanitize_textures(appearance.textures) or {self.texture or agent_api.config.living_default_texture}
+        self.object:set_properties({
+            visual = "mesh",
+            mesh = appearance.mesh,
+            textures = textures,
+            visual_size = type(appearance.visual_size) == "table" and appearance.visual_size or LIVING_VISUAL_SIZE,
+            collisionbox = LIVING_COLLISIONBOX,
+        })
+        return
+    end
+
+    if should_use_character_visual() then
+        self.texture = self.texture or pick_living_agent_texture()
+        self.object:set_properties({
+            visual = "mesh",
+            mesh = agent_api.config.living_mesh,
+            textures = {self.texture},
+            visual_size = LIVING_VISUAL_SIZE,
+            collisionbox = LIVING_COLLISIONBOX,
+        })
+        return
+    end
+end
+
+local function clamp(value, min_v, max_v)
+    if value < min_v then
+        return min_v
+    elseif value > max_v then
+        return max_v
+    end
+    return value
+end
+
+local function yaw_to_dir(yaw)
+    local dir = minetest.yaw_to_dir(yaw)
+    return {x = dir.x, y = 0, z = dir.z}
+end
+
+local function find_nearest_players(pos)
+    local nearest_focus = nil
+    local nearest_focus_dist = nil
+    local nearest_threat = nil
+    local nearest_threat_dist = nil
+
+    for _, player in ipairs(minetest.get_connected_players()) do
+        local player_pos = player:get_pos()
+        if player_pos then
+            local dist = vector.distance(pos, player_pos)
+            if dist <= FOLLOW_RADIUS and (not nearest_focus_dist or dist < nearest_focus_dist) then
+                nearest_focus = player
+                nearest_focus_dist = dist
+            end
+            if dist <= AVOID_RADIUS and (not nearest_threat_dist or dist < nearest_threat_dist) then
+                nearest_threat = player
+                nearest_threat_dist = dist
+            end
+        end
+    end
+
+    return nearest_focus, nearest_focus_dist, nearest_threat, nearest_threat_dist
+end
+
+local function default_decision(agent, perception)
+    if agent.state.fatigue > 85 then
+        return BEHAVIOR.REST
+    end
+
+    if perception.threat and perception.threat_distance and perception.threat_distance < AVOID_RADIUS then
+        return BEHAVIOR.AVOID
+    end
+
+    if perception.focus and perception.focus_distance and perception.focus_distance < FOLLOW_RADIUS then
+        return BEHAVIOR.FOLLOW
+    end
+
+    if agent.state.hunger > 60 and agent.state.fatigue < 60 then
+        return BEHAVIOR.WANDER
+    end
+
+    return BEHAVIOR.IDLE
+end
+
+-- Decision provider can be swapped for future LLM/GOAP implementations
+agent_api.living_decision = default_decision
+
+function agent_api.set_living_decision(decider)
+    if type(decider) == "function" then
+        agent_api.living_decision = decider
+        log("info", "Living agent decision function updated")
+    else
+        log("warning", "Attempted to set invalid living_decision")
+    end
+end
+
+local function update_needs(agent, dtime, behavior)
+    agent.state.hunger = clamp(agent.state.hunger + (HUNGER_RATE * dtime), 0, NEED_MAX)
+    local fatigue_delta = FATIGUE_RATE * dtime
+    if behavior == BEHAVIOR.REST then
+        fatigue_delta = fatigue_delta * -REST_RECOVERY
+    end
+    agent.state.fatigue = clamp(agent.state.fatigue + fatigue_delta, 0, NEED_MAX)
+end
+
+local function act(agent, behavior, perception)
+    local obj = agent.object
+    if not obj then
+        return
+    end
+    if obj:is_player() then
+        return
+    end
+
+    if behavior == BEHAVIOR.REST or behavior == BEHAVIOR.IDLE then
+        local velocity = obj:get_velocity() or {x = 0, y = 0, z = 0}
+        obj:set_velocity({x = 0, y = velocity.y, z = 0})
+        return
+    end
+
+    local pos = obj:get_pos()
+    if not pos then
+        return
+    end
+    if behavior == BEHAVIOR.WANDER then
+        if agent.wander_timer <= 0 then
+            agent.wander_timer = 2.5
+            agent.wander_yaw = (living_rng:next(0, RANDOM_STEPS) / RANDOM_STEPS) * FULL_ROTATION
+        else
+            agent.wander_timer = agent.wander_timer - agent.step_interval
+        end
+        obj:set_yaw(agent.wander_yaw)
+        local dir = yaw_to_dir(agent.wander_yaw)
+        obj:set_velocity(vector.multiply(dir, 1.5))
+    elseif behavior == BEHAVIOR.FOLLOW and perception.focus then
+        local target_pos = perception.focus:get_pos()
+        if not target_pos then
+            return
+        end
+        local dir = vector.direction(pos, target_pos)
+        local yaw = math.atan2(dir.z, dir.x) + YAW_OFFSET
+        obj:set_yaw(yaw)
+        obj:set_velocity(vector.multiply(yaw_to_dir(yaw), 2.0))
+    elseif behavior == BEHAVIOR.AVOID and perception.threat then
+        local target_pos = perception.threat:get_pos()
+        if not target_pos then
+            return
+        end
+        local dir = vector.direction(target_pos, pos)
+        local yaw = math.atan2(dir.z, dir.x) + YAW_OFFSET
+        obj:set_yaw(yaw)
+        obj:set_velocity(vector.multiply(yaw_to_dir(yaw), 2.5))
+    end
+end
+
+minetest.register_entity("agent_api:living_agent", {
+    initial_properties = get_living_agent_initial_properties(),
+
+    on_activate = function(self, staticdata, dtime_s)
+        self.state = {hunger = 0, fatigue = 0, inventory = {}}
+        self.behavior = BEHAVIOR.IDLE
+        self.wander_timer = 0
+        self.step_interval = 0.5
+        self.step_accum = 0
+        self.wander_yaw = 0
+        self.texture = nil
+        self.appearance = nil
+        self.object:set_acceleration({x = 0, y = -9.8, z = 0})
+        if staticdata and staticdata ~= "" then
+            local data = minetest.deserialize(staticdata) or {}
+            self.state = data.state or self.state
+            self.behavior = data.behavior or self.behavior
+            self.wander_timer = data.wander_timer or self.wander_timer
+            self.wander_yaw = data.wander_yaw or self.wander_yaw
+            self.texture = data.texture or self.texture
+            self.appearance = data.appearance or self.appearance
+        end
+
+        apply_living_agent_appearance(self)
+
+        living_agent_counter = living_agent_counter + 1
+        self.agent_id = "living_" .. tostring(living_agent_counter)
+        agent_api.living_agents[self.agent_id] = self
+        log("info", "Living agent spawned: " .. self.agent_id)
+    end,
+
+    get_staticdata = function(self)
+        return minetest.serialize({
+            state = self.state,
+            behavior = self.behavior,
+            wander_timer = self.wander_timer,
+            wander_yaw = self.wander_yaw,
+            texture = self.texture,
+            appearance = self.appearance,
+        })
+    end,
+
+    on_deactivate = function(self)
+        if self.agent_id then
+            agent_api.living_agents[self.agent_id] = nil
+        end
+    end,
+
+    on_step = function(self, dtime)
+        self.step_accum = self.step_accum + dtime
+        if self.step_accum < self.step_interval then
+            return
+        end
+
+        local perception = {}
+        local pos = self.object:get_pos()
+        if not pos then
+            return
+        end
+        perception.focus, perception.focus_distance, perception.threat, perception.threat_distance = find_nearest_players(pos)
+        if perception.threat and perception.focus and perception.threat == perception.focus then
+            perception.focus = nil
+        end
+        perception.pos = pos
+
+        local next_behavior = agent_api.living_decision(self, perception)
+        if next_behavior ~= self.behavior then
+            self.behavior = next_behavior
+            log("debug", "Living agent " .. self.agent_id .. " behavior -> " .. next_behavior)
+        end
+
+        update_needs(self, self.step_accum, self.behavior)
+        act(self, self.behavior, perception)
+        self.step_accum = 0
+    end,
+})
+
+function agent_api.spawn_living_agents(center_pos, count, opts)
+    if not center_pos then
+        return
+    end
+    count = count or 1
+
+    local appearance = nil
+    if type(opts) == "table" then
+        appearance = opts.appearance
+        if not appearance and opts.player then
+            appearance = get_player_appearance(opts.player)
+        end
+    end
+
+    local staticdata = ""
+    if appearance then
+        staticdata = minetest.serialize({appearance = appearance})
+    end
+
+    for i = 1, count do
+        local offset = {
+            x = living_rng:next(-DEBUG_SPAWN_RADIUS, DEBUG_SPAWN_RADIUS),
+            y = LIVING_SPAWN_Y_OFFSET,
+            z = living_rng:next(-DEBUG_SPAWN_RADIUS, DEBUG_SPAWN_RADIUS),
+        }
+        local spawn_pos = vector.add(center_pos, offset)
+        minetest.add_entity(spawn_pos, "agent_api:living_agent", staticdata)
+    end
+end
+
 -- ============================================================================
 -- Player Join Handling
 -- ============================================================================
@@ -59,6 +557,17 @@ minetest.register_on_joinplayer(function(player)
             minetest.after(1.0, function()
                 agent_api.create_agent(name)
                 log("info", "Auto-created agent for: " .. name)
+            end)
+        end
+    end
+    if agent_api.config.debug_spawn then
+        local pos = player:get_pos()
+        if pos then
+            local player_name = player:get_player_name()
+            minetest.after(1.0, function()
+                local spawner = minetest.get_player_by_name(player_name)
+                agent_api.spawn_living_agents(pos, agent_api.config.debug_spawn_count, {player = spawner})
+                log("info", "Debug spawned living agents near " .. player_name)
             end)
         end
     end
@@ -613,6 +1122,18 @@ minetest.register_chatcommand("agent_create", {
     end,
 })
 
+minetest.register_chatcommand("agent_switch", {
+    description = "Create an AI agent from the calling player",
+    params = "",
+    func = function(name, param)
+        local create_cmd = minetest.registered_chatcommands["agent_create"]
+        if create_cmd and create_cmd.func then
+            return create_cmd.func(name, param)
+        end
+        return false, "Agent creation command unavailable"
+    end,
+})
+
 minetest.register_chatcommand("agent_attach", {
     description = "Attach agent to another player (requires server privilege)",
     params = "<player_name>",
@@ -642,6 +1163,20 @@ minetest.register_chatcommand("agent_remove", {
         else
             return false, "Agent not found: " .. target_name
         end
+    end,
+})
+
+minetest.register_chatcommand("agent_spawn_debug", {
+    description = "Spawn living demo agents near you",
+    params = "[count]",
+    func = function(name, param)
+        local player = minetest.get_player_by_name(name)
+        if not player then
+            return false, "Player not found"
+        end
+        local count = tonumber(param) or agent_api.config.debug_spawn_count or 3
+        agent_api.spawn_living_agents(player:get_pos(), count, {player = player})
+        return true, "Spawned " .. count .. " living agents nearby"
     end,
 })
 
